@@ -1,0 +1,64 @@
+package com.mdau.ushirika.module.notification.controller;
+
+import com.mdau.ushirika.common.response.ApiResponse;
+import com.mdau.ushirika.common.response.PagedResponse;
+import com.mdau.ushirika.module.notification.dto.NotificationLogDto;
+import com.mdau.ushirika.module.notification.enums.NotificationChannel;
+import com.mdau.ushirika.module.notification.enums.NotificationStatus;
+import com.mdau.ushirika.module.notification.repository.NotificationLogRepository;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/admin/notifications")
+@PreAuthorize("hasAnyRole('ADMIN','SUPERADMIN')")
+@SecurityRequirement(name = "bearerAuth")
+@RequiredArgsConstructor
+@Tag(name = "Notifications — Admin", description = "View outbound email and SMS delivery logs")
+public class AdminNotificationController {
+
+    private final NotificationLogRepository logRepository;
+
+    @GetMapping("/logs")
+    @Operation(summary = "List notification logs, optionally filtered by channel and/or status")
+    public ResponseEntity<ApiResponse<PagedResponse<NotificationLogDto>>> logs(
+            @RequestParam(required = false) NotificationChannel channel,
+            @RequestParam(required = false) NotificationStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size
+    ) {
+        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        var result = (channel != null && status != null)
+                ? logRepository.findAllByChannelAndStatusOrderByCreatedAtDesc(channel, status, pageable)
+                : (channel != null)
+                        ? logRepository.findAllByChannelOrderByCreatedAtDesc(channel, pageable)
+                        : (status != null)
+                                ? logRepository.findAllByStatusOrderByCreatedAtDesc(status, pageable)
+                                : logRepository.findAllByOrderByCreatedAtDesc(pageable);
+
+        return ResponseEntity.ok(ApiResponse.ok("Logs retrieved",
+                PagedResponse.of(result.map(NotificationLogDto::from))));
+    }
+
+    @GetMapping("/logs/recipient")
+    @Operation(summary = "Look up all notifications sent to a specific email or phone")
+    public ResponseEntity<ApiResponse<PagedResponse<NotificationLogDto>>> byRecipient(
+            @RequestParam String recipient,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size
+    ) {
+        var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return ResponseEntity.ok(ApiResponse.ok("Logs retrieved",
+                PagedResponse.of(logRepository
+                        .findAllByRecipientOrderByCreatedAtDesc(recipient, pageable)
+                        .map(NotificationLogDto::from))));
+    }
+}
