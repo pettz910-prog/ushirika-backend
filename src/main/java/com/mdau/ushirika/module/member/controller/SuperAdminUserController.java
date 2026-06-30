@@ -3,6 +3,8 @@ package com.mdau.ushirika.module.member.controller;
 import com.mdau.ushirika.common.response.ApiResponse;
 import com.mdau.ushirika.common.response.PagedResponse;
 import com.mdau.ushirika.module.auth.dto.UserDto;
+import com.mdau.ushirika.module.auth.dto.UserProfileDto;
+import com.mdau.ushirika.module.member.dto.UpdateMemberTierRequest;
 import com.mdau.ushirika.module.member.dto.UpdateRoleRequest;
 import com.mdau.ushirika.module.member.service.AdminUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -63,5 +65,14 @@ public class SuperAdminUserController {
     @Operation(summary = "Deactivate a user account (login blocked)")
     public ResponseEntity<ApiResponse<UserDto>> deactivate(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok("User deactivated", adminUserService.setActive(id, false)));
+    }
+
+    @PatchMapping("/{id}/tier")
+    @Operation(summary = "Update an approved member's contribution plan tier")
+    public ResponseEntity<ApiResponse<UserProfileDto>> updateTier(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateMemberTierRequest req
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok("Member tier updated", adminUserService.updateTier(id, req)));
     }
 }

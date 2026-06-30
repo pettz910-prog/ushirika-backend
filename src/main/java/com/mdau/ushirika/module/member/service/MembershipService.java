@@ -225,6 +225,9 @@ public class MembershipService {
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for approved application."));
         profile.setMemberId(generateMemberId());
         profile.setMemberSince(LocalDate.now());
+        if (profile.getMembershipTier() == null) {
+            profile.setMembershipTier("Standard");
+        }
         profileRepository.save(profile);
 
         emailService.sendPlain(

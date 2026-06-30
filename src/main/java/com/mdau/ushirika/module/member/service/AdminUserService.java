@@ -5,10 +5,14 @@ import com.mdau.ushirika.common.exception.ForbiddenException;
 import com.mdau.ushirika.common.exception.ResourceNotFoundException;
 import com.mdau.ushirika.common.response.PagedResponse;
 import com.mdau.ushirika.module.auth.dto.UserDto;
+import com.mdau.ushirika.module.auth.dto.UserProfileDto;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.enums.UserRole;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
+import com.mdau.ushirika.module.member.dto.UpdateMemberTierRequest;
 import com.mdau.ushirika.module.member.dto.UpdateRoleRequest;
+import com.mdau.ushirika.module.member.entity.MemberProfile;
+import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,6 +26,7 @@ import java.util.UUID;
 public class AdminUserService {
 
     private final UserRepository userRepository;
+    private final MemberProfileRepository profileRepository;
 
     @Transactional(readOnly = true)
     public PagedResponse<UserDto> listUsers(Pageable pageable) {
@@ -82,6 +87,23 @@ public class AdminUserService {
         target.setActive(active);
         userRepository.save(target);
         return UserDto.from(target);
+    }
+
+    /**
+     * Update a member's contribution plan tier (Standard / Family / Patron).
+     * Only meaningful for users who have an approved MemberProfile.
+     */
+    @Transactional
+    public UserProfileDto updateTier(UUID userId, UpdateMemberTierRequest req) {
+        User target = findById(userId);
+        MemberProfile profile = profileRepository.findByUser(target)
+                .orElseThrow(() -> new BadRequestException(
+                        "This user does not have an approved member profile yet. " +
+                        "Tier can only be set after membership approval."));
+
+        profile.setMembershipTier(req.tier());
+        profileRepository.save(profile);
+        return UserProfileDto.from(target, profile);
     }
 
     private User findById(UUID id) {

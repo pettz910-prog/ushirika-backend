@@ -15,7 +15,8 @@ import java.time.LocalDate;
         // Common admin filters
         @Index(name = "idx_mp_county",       columnList = "county"),
         @Index(name = "idx_mp_gender",       columnList = "gender"),
-        @Index(name = "idx_mp_member_since", columnList = "member_since")
+        @Index(name = "idx_mp_member_since", columnList = "member_since"),
+        @Index(name = "idx_mp_tier",         columnList = "membership_tier")
     }
 )
 @Getter
@@ -64,4 +65,12 @@ public class MemberProfile extends BaseEntity {
 
     @Column(name = "member_since")
     private LocalDate memberSince;
+
+    /**
+     * Contribution plan tier name — matches ContributionPlan.name (Standard / Family / Patron).
+     * Set to "Standard" on membership approval; updated by admin when member upgrades.
+     */
+    @Column(name = "membership_tier", length = 50)
+    @Builder.Default
+    private String membershipTier = "Standard";
 }
