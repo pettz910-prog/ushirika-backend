@@ -43,5 +43,7 @@ public interface MemberContributionRepository extends JpaRepository<MemberContri
 
     Optional<MemberContribution> findByPaymentSessionId(String sessionId);
 
+    boolean existsByPeerPaymentId(UUID peerPaymentId);
+
     long countByMember(User member);
 }

@@ -8,5 +8,9 @@ import java.util.UUID;
 
 public interface ContributionPlanRepository extends JpaRepository<ContributionPlan, UUID> {
 
-    List<ContributionPlan> findAllByActiveTrue();
+    List<ContributionPlan> findAllByActiveTrueOrderByDisplayOrderAsc();
+
+    List<ContributionPlan> findAllByOrderByDisplayOrderAsc();
+
+    boolean existsByName(String name);
 }

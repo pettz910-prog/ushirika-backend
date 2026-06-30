@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashMap;
 
 @Slf4j
 @Service
@@ -44,14 +45,20 @@ public class ContributionService {
 
     @Transactional(readOnly = true)
     public List<ContributionPlanDto> listActivePlans() {
-        return planRepository.findAllByActiveTrue().stream()
+        return planRepository.findAllByActiveTrueOrderByDisplayOrderAsc().stream()
                 .map(ContributionPlanDto::from).toList();
     }
 
     @Transactional(readOnly = true)
     public List<ContributionPlanDto> listAllPlans() {
-        return planRepository.findAll().stream()
+        return planRepository.findAllByOrderByDisplayOrderAsc().stream()
                 .map(ContributionPlanDto::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ContributionPlanDto getPlan(UUID id) {
+        return ContributionPlanDto.from(planRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Contribution plan not found: " + id)));
     }
 
     @Transactional
@@ -61,6 +68,9 @@ public class ContributionService {
                 .description(req.description())
                 .amount(req.amount())
                 .frequency(req.frequency())
+                .features(req.features() != null ? req.features() : List.of())
+                .badge(req.badge())
+                .displayOrder(req.displayOrder())
                 .active(req.active())
                 .build();
         return ContributionPlanDto.from(planRepository.save(plan));
@@ -74,8 +84,18 @@ public class ContributionService {
         plan.setDescription(req.description());
         plan.setAmount(req.amount());
         plan.setFrequency(req.frequency());
+        plan.setFeatures(req.features() != null ? req.features() : List.of());
+        plan.setBadge(req.badge());
+        plan.setDisplayOrder(req.displayOrder());
         plan.setActive(req.active());
         return ContributionPlanDto.from(planRepository.save(plan));
+    }
+
+    @Transactional
+    public void deletePlan(UUID id) {
+        ContributionPlan plan = planRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Contribution plan not found: " + id));
+        planRepository.delete(plan);
     }
 
     // ----------------------------------------------------------------- Payment initiation

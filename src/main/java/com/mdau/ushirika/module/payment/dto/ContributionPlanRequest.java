@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public record ContributionPlanRequest(
 
@@ -20,6 +21,15 @@ public record ContributionPlanRequest(
 
         @NotNull(message = "Frequency is required")
         ContributionFrequency frequency,
+
+        /** Ordered list of privilege/feature strings displayed as bullet points. */
+        List<String> features,
+
+        /** Optional badge text shown on the plan card, e.g. "Most Common". Null = no badge. */
+        String badge,
+
+        /** Display order on the membership page — lower value appears first. */
+        int displayOrder,
 
         boolean active
 ) {}

@@ -3,6 +3,7 @@ package com.mdau.ushirika.module.payment.entity;
 import com.mdau.ushirika.common.entity.BaseEntity;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.payment.enums.ContributionSource;
+import com.mdau.ushirika.module.payment.entity.PeerPayment;
 import com.mdau.ushirika.module.payment.entity.StripePayment;
 import jakarta.persistence.*;
 import lombok.*;
@@ -24,7 +25,9 @@ import java.math.BigDecimal;
         // "Has this member already paid for this period?"
         @Index(name = "idx_mc_user_period",  columnList = "user_id, period"),
         // Date-range financial reports
-        @Index(name = "idx_mc_created_at",   columnList = "created_at")
+        @Index(name = "idx_mc_created_at",   columnList = "created_at"),
+        // Idempotency check for peer-payment-linked contributions
+        @Index(name = "idx_mc_peer_payment", columnList = "peer_payment_id")
     }
 )
 @Getter
@@ -81,6 +84,15 @@ public class MemberContribution extends BaseEntity {
      */
     @Column(name = "period", length = 10)
     private String period;
+
+    /**
+     * Set for PEER contributions (member-reported Zelle/Venmo/CashApp).
+     * Null for STRIPE and MANUAL contributions.
+     */
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "peer_payment_id", nullable = true, unique = true,
+                foreignKey = @ForeignKey(name = "fk_mc_peer_payment"))
+    private PeerPayment peerPayment;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

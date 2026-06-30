@@ -52,12 +52,25 @@ public class AdminContributionController {
                 .body(ApiResponse.ok("Plan created", contributionService.createPlan(req)));
     }
 
+    @GetMapping("/plans/{id}")
+    @Operation(summary = "Get a single contribution plan by ID")
+    public ResponseEntity<ApiResponse<ContributionPlanDto>> getPlan(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok("Plan retrieved", contributionService.getPlan(id)));
+    }
+
     @PutMapping("/plans/{id}")
-    @Operation(summary = "Update a contribution plan")
+    @Operation(summary = "Update a contribution plan (including features and badge)")
     public ResponseEntity<ApiResponse<ContributionPlanDto>> updatePlan(
             @PathVariable UUID id,
             @Valid @RequestBody ContributionPlanRequest req
     ) {
         return ResponseEntity.ok(ApiResponse.ok("Plan updated", contributionService.updatePlan(id, req)));
+    }
+
+    @DeleteMapping("/plans/{id}")
+    @Operation(summary = "Delete a contribution plan (permanent)")
+    public ResponseEntity<ApiResponse<Void>> deletePlan(@PathVariable UUID id) {
+        contributionService.deletePlan(id);
+        return ResponseEntity.ok(ApiResponse.ok("Plan deleted"));
     }
 }

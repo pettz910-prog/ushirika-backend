@@ -18,6 +18,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -209,6 +211,30 @@ public class AuthService {
                 UserDto.from(user)
         );
     }
+
+    // ── Change password (authenticated) ───────────────────────────────────────
+
+    @Transactional
+    public void changePassword(ChangePasswordRequest req) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = findByEmail(email);
+
+        if (!passwordEncoder.matches(req.currentPassword(), user.getPassword())) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+        if (req.currentPassword().equals(req.newPassword())) {
+            throw new BadRequestException("New password must be different from the current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(req.newPassword()));
+        userRepository.save(user);
+
+        // Revoke all existing refresh tokens so other sessions must re-login
+        refreshTokenRepository.revokeAllUserTokens(user);
+        log.info("Password changed for user: {}", email);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private User findByEmail(String email) {
         return userRepository.findByEmail(email.toLowerCase())
