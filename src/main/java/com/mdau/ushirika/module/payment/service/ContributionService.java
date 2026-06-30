@@ -238,9 +238,9 @@ public class ContributionService {
     // ----------------------------------------------------------------- Admin queries
 
     @Transactional(readOnly = true)
-    public PagedResponse<MemberContributionDto> listAll(Pageable pageable) {
+    public PagedResponse<AdminMemberContributionDto> listAll(Pageable pageable) {
         return PagedResponse.of(contributionRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(MemberContributionDto::from));
+                .map(AdminMemberContributionDto::from));
     }
 
     // ----------------------------------------------------------------- Helpers

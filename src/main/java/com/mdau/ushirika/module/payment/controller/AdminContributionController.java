@@ -30,8 +30,8 @@ public class AdminContributionController {
     private final ContributionService contributionService;
 
     @GetMapping
-    @Operation(summary = "List all confirmed contributions (paginated)")
-    public ResponseEntity<ApiResponse<PagedResponse<MemberContributionDto>>> listAll(
+    @Operation(summary = "List all confirmed contributions (paginated) — includes member identity")
+    public ResponseEntity<ApiResponse<PagedResponse<AdminMemberContributionDto>>> listAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
