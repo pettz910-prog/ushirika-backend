@@ -10,8 +10,8 @@ import java.util.UUID;
 
 /**
  * Full profile for the authenticated user — merges auth fields with the
- * optional MemberProfile row that is created when the member submits their
- * application and becomes non-null once the application is approved.
+ * optional MemberProfile row. Field names are intentionally aligned with
+ * the frontend User interface so the fetch swap is zero-change on the client.
  */
 public record UserProfileDto(
         UUID id,
@@ -21,23 +21,27 @@ public record UserProfileDto(
         String lastName,
         String fullName,
         String phone,
-        UserRole role,
+        /** "member" for regular members; "admin" for all staff roles. */
+        String role,
         OfficialTitle officialTitle,
         boolean emailVerified,
         boolean active,
-        /** "pending" = no approved memberId yet | "active" = full member | "suspended" = deactivated */
+        /** "pending" | "active" | "suspended" */
         String status,
-        String membershipTier,
-        LocalDate memberSince,
-        String county,
+        /** "Standard" | "Family" | "Patron" */
+        String tier,
+        /** ISO date string (YYYY-MM-DD) — null until membership is approved. */
+        LocalDate joinedAt,
+        /** Nearest city / county of residence — maps to MemberProfile.county. */
+        String city,
         String photoUrl
 ) {
     public static UserProfileDto from(User user, MemberProfile profile) {
         String memberId  = profile != null ? profile.getMemberId()       : null;
         String tier      = profile != null && profile.getMembershipTier() != null
                            ? profile.getMembershipTier() : "Standard";
-        LocalDate since  = profile != null ? profile.getMemberSince()    : null;
-        String county    = profile != null ? profile.getCounty()         : null;
+        LocalDate joined = profile != null ? profile.getMemberSince()    : null;
+        String city      = profile != null ? profile.getCounty()         : null;
         String photoUrl  = profile != null ? profile.getPhotoUrl()       : null;
 
         String status;
@@ -49,6 +53,8 @@ public record UserProfileDto(
             status = "pending";
         }
 
+        String role = user.getRole() == UserRole.MEMBER ? "member" : "admin";
+
         return new UserProfileDto(
                 user.getId(),
                 memberId,
@@ -57,14 +63,14 @@ public record UserProfileDto(
                 user.getLastName(),
                 user.getFullName(),
                 user.getPhone(),
-                user.getRole(),
+                role,
                 user.getOfficialTitle(),
                 user.isEmailVerified(),
                 user.isActive(),
                 status,
                 tier,
-                since,
-                county,
+                joined,
+                city,
                 photoUrl
         );
     }
