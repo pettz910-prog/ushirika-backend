@@ -8,6 +8,8 @@ import com.mdau.ushirika.module.auth.entity.RefreshToken;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.repository.RefreshTokenRepository;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
+import com.mdau.ushirika.module.member.entity.MemberProfile;
+import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import com.mdau.ushirika.module.notification.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final MemberProfileRepository profileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -135,12 +138,14 @@ public class AuthService {
             throw new BadRequestException("Refresh token has expired or been revoked. Please log in again");
         }
 
-        String newAccessToken = jwtService.generateAccessToken(stored.getUser());
+        User refreshUser = stored.getUser();
+        MemberProfile refreshProfile = profileRepository.findByUser(refreshUser).orElse(null);
+        String newAccessToken = jwtService.generateAccessToken(refreshUser);
         return AuthResponse.of(
                 newAccessToken,
                 stored.getToken(),
                 jwtService.getAccessTokenExpiryMs() / 1000,
-                UserDto.from(stored.getUser())
+                UserProfileDto.from(refreshUser, refreshProfile)
         );
     }
 
@@ -204,11 +209,12 @@ public class AuthService {
                 .build();
         refreshTokenRepository.save(refreshToken);
 
+        MemberProfile profile = profileRepository.findByUser(user).orElse(null);
         return AuthResponse.of(
                 accessToken,
                 rawRefreshToken,
                 jwtService.getAccessTokenExpiryMs() / 1000,
-                UserDto.from(user)
+                UserProfileDto.from(user, profile)
         );
     }
 
