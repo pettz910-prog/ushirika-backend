@@ -4,6 +4,7 @@ import com.mdau.ushirika.common.response.ApiResponse;
 import com.mdau.ushirika.common.response.PagedResponse;
 import com.mdau.ushirika.module.auth.dto.UserDto;
 import com.mdau.ushirika.module.auth.dto.UserProfileDto;
+import com.mdau.ushirika.module.member.dto.CreateMemberRequest;
 import com.mdau.ushirika.module.member.dto.UpdateMemberTierRequest;
 import com.mdau.ushirika.module.member.dto.UpdateRoleRequest;
 import com.mdau.ushirika.module.member.service.AdminUserService;
@@ -14,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -44,6 +46,14 @@ public class SuperAdminUserController {
     @Operation(summary = "Get a single user by ID")
     public ResponseEntity<ApiResponse<UserDto>> get(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok("User retrieved", adminUserService.getUser(id)));
+    }
+
+    @PostMapping
+    @Operation(summary = "Create a verified member account directly — bypasses the application flow. Sends a welcome email with temporary credentials.")
+    public ResponseEntity<ApiResponse<UserProfileDto>> create(@Valid @RequestBody CreateMemberRequest req) {
+        UserProfileDto created = adminUserService.createMember(req);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok("Member account created. Credentials have been emailed to " + req.email(), created));
     }
 
     @PutMapping("/{id}/role")
