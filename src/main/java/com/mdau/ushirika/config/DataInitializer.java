@@ -3,6 +3,10 @@ package com.mdau.ushirika.config;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.enums.UserRole;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
+import com.mdau.ushirika.module.member.entity.MemberProfile;
+import com.mdau.ushirika.module.member.enums.Gender;
+import com.mdau.ushirika.module.member.enums.MaritalStatus;
+import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import com.mdau.ushirika.module.payment.entity.ContributionPlan;
 import com.mdau.ushirika.module.payment.enums.ContributionFrequency;
 import com.mdau.ushirika.module.payment.repository.ContributionPlanRepository;
@@ -16,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Slf4j
@@ -24,6 +29,7 @@ import java.util.List;
 public class DataInitializer implements ApplicationRunner {
 
     private final UserRepository userRepository;
+    private final MemberProfileRepository memberProfileRepository;
     private final ContributionPlanRepository planRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -36,10 +42,17 @@ public class DataInitializer implements ApplicationRunner {
     @Value("${app.superadmin.phone:+254000000000}")
     private String superAdminPhone;
 
+    @Value("${app.test-member.email:member@ushirikawelfare.org}")
+    private String testMemberEmail;
+
+    @Value("${app.test-member.password:Member@2025!}")
+    private String testMemberPassword;
+
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
         seedSuperAdmin();
+        seedTestMember();
         seedContributionPlans();
     }
 
@@ -62,6 +75,48 @@ public class DataInitializer implements ApplicationRunner {
         log.warn("  SUPERADMIN created: {}", superAdminEmail);
         log.warn("  Change the default password immediately via /auth/reset-password");
         log.warn("========================================================");
+    }
+
+    private void seedTestMember() {
+        if (userRepository.existsByEmail(testMemberEmail)) return;
+
+        User member = User.builder()
+                .firstName("Wekesa")
+                .lastName("Wanjala")
+                .email(testMemberEmail)
+                .phone("+14695550142")
+                .password(passwordEncoder.encode(testMemberPassword))
+                .role(UserRole.MEMBER)
+                .emailVerified(true)
+                .active(true)
+                .build();
+
+        member = userRepository.save(member);
+
+        MemberProfile profile = MemberProfile.builder()
+                .user(member)
+                .idNumber("TEST00000001")
+                .dateOfBirth(LocalDate.of(1988, 4, 15))
+                .gender(Gender.MALE)
+                .address("6702 Ambercrest Dr, Arlington, TX 76002")
+                .county("Vihiga")
+                .maritalStatus(MaritalStatus.MARRIED)
+                .spouseName("Aisha Wanjala")
+                .nextOfKinName("Peter Wanjala")
+                .nextOfKinPhone("+14695550143")
+                .nextOfKinRelationship("Sibling")
+                .emergencyContactName("Aisha Wanjala")
+                .emergencyContactPhone("+14695550144")
+                .occupation("Registered Nurse")
+                .employer("Texas Health Resources")
+                .heardAboutUs("Friend or member")
+                .memberId("UW-2025-0001")
+                .memberSince(LocalDate.of(2022, 3, 14))
+                .membershipTier("Family")
+                .build();
+
+        memberProfileRepository.save(profile);
+        log.info("Test member seeded: {} / password configured via app.test-member.password", testMemberEmail);
     }
 
     private void seedContributionPlans() {

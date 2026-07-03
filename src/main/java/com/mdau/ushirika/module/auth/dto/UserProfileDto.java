@@ -47,7 +47,8 @@ public record UserProfileDto(
         String status;
         if (!user.isActive()) {
             status = "suspended";
-        } else if (memberId != null) {
+        } else if (user.getRole() != UserRole.MEMBER || memberId != null) {
+            // non-member staff and fully-approved members are active
             status = "active";
         } else {
             status = "pending";
