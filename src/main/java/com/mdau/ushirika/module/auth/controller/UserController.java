@@ -4,7 +4,9 @@ import com.mdau.ushirika.common.exception.ResourceNotFoundException;
 import com.mdau.ushirika.common.response.ApiResponse;
 import com.mdau.ushirika.module.auth.dto.UserProfileDto;
 import com.mdau.ushirika.module.auth.entity.User;
+import com.mdau.ushirika.module.auth.enums.UserRole;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
+import com.mdau.ushirika.module.dues.service.MembershipDuesService;
 import com.mdau.ushirika.module.member.entity.MemberProfile;
 import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,6 +27,7 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final MemberProfileRepository profileRepository;
+    private final MembershipDuesService duesService;
 
     @GetMapping("/me")
     @Operation(
@@ -36,6 +39,15 @@ public class UserController {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found."));
         MemberProfile profile = profileRepository.findByUser(user).orElse(null);
-        return ResponseEntity.ok(ApiResponse.ok("Profile fetched", UserProfileDto.from(user, profile)));
+
+        // Resolve dues status only for approved members
+        String duesStatus = null;
+        if (user.getRole() == UserRole.MEMBER && profile != null && profile.getMemberId() != null) {
+            duesStatus = duesService.getCurrentYearStatus(user)
+                    .map(Enum::name)
+                    .orElse(null);
+        }
+
+        return ResponseEntity.ok(ApiResponse.ok("Profile fetched", UserProfileDto.from(user, profile, duesStatus)));
     }
 }

@@ -26,35 +26,52 @@ public record UserProfileDto(
         OfficialTitle officialTitle,
         boolean emailVerified,
         boolean active,
-        /** "pending" | "active" | "suspended" | "ceased" */
+        /** "pending" | "inactive" | "active" | "suspended" | "ceased" */
         String status,
         boolean membershipCeased,
-        /** "Standard" | "Family" | "Patron" */
-        String tier,
         /** ISO date string (YYYY-MM-DD) — null until membership is approved. */
         LocalDate joinedAt,
         /** Nearest city / county of residence — maps to MemberProfile.county. */
         String city,
         String photoUrl
 ) {
+    /**
+     * Backward-compatible overload — callers that don't have dues context
+     * pass null for duesStatus (approved members will show "active").
+     */
     public static UserProfileDto from(User user, MemberProfile profile) {
-        String memberId  = profile != null ? profile.getMemberId()       : null;
-        String tier      = profile != null && profile.getMembershipTier() != null
-                           ? profile.getMembershipTier() : "Standard";
-        LocalDate joined = profile != null ? profile.getMemberSince()    : null;
-        String city      = profile != null ? profile.getCounty()         : null;
-        String photoUrl  = profile != null ? profile.getPhotoUrl()       : null;
+        return from(user, profile, null);
+    }
+
+    /**
+     * Full overload used by endpoints that need accurate "inactive" status.
+     * duesStatus: "PAID" | "WAIVED" | "PENDING" | "OVERDUE" | null
+     */
+    public static UserProfileDto from(User user, MemberProfile profile, String duesStatus) {
+        String memberId  = profile != null ? profile.getMemberId()    : null;
+        LocalDate joined = profile != null ? profile.getMemberSince() : null;
+        String city      = profile != null ? profile.getCounty()      : null;
+        String photoUrl  = profile != null ? profile.getPhotoUrl()    : null;
 
         String status;
         if (user.isMembershipCeased()) {
             status = "ceased";
         } else if (!user.isActive()) {
             status = "suspended";
-        } else if (user.getRole() != UserRole.MEMBER || memberId != null) {
-            // non-member staff and fully-approved members are active
+        } else if (user.getRole() != UserRole.MEMBER) {
+            // Staff roles are always considered active regardless of dues
             status = "active";
-        } else {
+        } else if (memberId == null) {
+            // Approved email but application not yet reviewed
             status = "pending";
+        } else if ("PAID".equals(duesStatus) || "WAIVED".equals(duesStatus)) {
+            status = "active";
+        } else if ("PENDING".equals(duesStatus) || "OVERDUE".equals(duesStatus)) {
+            // Member approved but annual dues not yet paid
+            status = "inactive";
+        } else {
+            // duesStatus null → no dues record exists yet; treat as inactive
+            status = "inactive";
         }
 
         String role = user.getRole() == UserRole.MEMBER ? "member" : "admin";
@@ -73,7 +90,6 @@ public record UserProfileDto(
                 user.isActive(),
                 status,
                 user.isMembershipCeased(),
-                tier,
                 joined,
                 city,
                 photoUrl

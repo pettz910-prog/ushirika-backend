@@ -18,6 +18,7 @@ import com.mdau.ushirika.module.member.enums.ApprovalDecision;
 import com.mdau.ushirika.module.member.repository.ApplicationApprovalRepository;
 import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import com.mdau.ushirika.module.member.repository.MembershipApplicationRepository;
+import com.mdau.ushirika.module.dues.service.MembershipDuesService;
 import com.mdau.ushirika.module.notification.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,7 @@ public class MembershipService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final QuorumApprovalService quorumApprovalService;
+    private final MembershipDuesService membershipDuesService;
 
     // ------------------------------------------------------------------ Member
 
@@ -241,6 +243,7 @@ public class MembershipService {
             profile.setMembershipTier("Standard");
         }
         profileRepository.save(profile);
+        membershipDuesService.createInitialDues(application.getUser());
 
         emailService.sendPlain(
                 application.getUser().getEmail(), application.getUser().getFullName(),

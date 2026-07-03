@@ -16,6 +16,7 @@ import com.mdau.ushirika.module.member.dto.UpdateRoleRequest;
 import com.mdau.ushirika.module.member.entity.MemberProfile;
 import com.mdau.ushirika.module.member.enums.Gender;
 import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
+import com.mdau.ushirika.module.dues.service.MembershipDuesService;
 import com.mdau.ushirika.module.notification.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -36,6 +37,7 @@ public class AdminUserService {
     private final MemberProfileRepository profileRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final MembershipDuesService membershipDuesService;
 
     @Transactional(readOnly = true)
     public PagedResponse<UserDto> listUsers(Pageable pageable) {
@@ -163,6 +165,7 @@ public class AdminUserService {
                 .membershipTier(tier)
                 .build();
         profileRepository.save(profile);
+        membershipDuesService.createInitialDues(user);
 
         sendWelcomeCredentials(user.getEmail(), user.getFirstName(), memberId, tempPassword);
 
