@@ -3,6 +3,8 @@ package com.mdau.ushirika.module.auth.repository;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.enums.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,4 +25,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     List<User> findAllByRoleIn(List<UserRole> roles);
 
     long countByRole(UserRole role);
+
+    @Query("SELECT u FROM User u WHERE LOWER(CONCAT(u.firstName, ' ', u.lastName)) = LOWER(:fullName)")
+    Optional<User> findByFullNameIgnoreCase(@Param("fullName") String fullName);
 }

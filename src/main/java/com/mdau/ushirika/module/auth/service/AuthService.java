@@ -118,13 +118,33 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest req) {
+        // Resolve the account regardless of whether the user typed an email,
+        // member ID (UW-YYYY-XXXX), or full name.
+        User user = resolveUser(req.username().trim());
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(req.email().toLowerCase(), req.password())
+                new UsernamePasswordAuthenticationToken(user.getEmail(), req.password())
         );
-        User user = findByEmail(req.email().toLowerCase());
-        // Revoke previous refresh tokens on fresh login (single-session per device strategy)
         refreshTokenRepository.revokeAllUserTokens(user);
         return issueTokens(user);
+    }
+
+    // ── Resolve user from flexible username ───────────────────────────────────
+
+    private User resolveUser(String input) {
+        // 1. Email
+        if (input.contains("@")) {
+            return userRepository.findByEmail(input.toLowerCase())
+                    .orElseThrow(() -> new ResourceNotFoundException("No account found"));
+        }
+        // 2. Member ID  (UW-YYYY-XXXX, case-insensitive)
+        if (input.toUpperCase().matches("UW-\\d{4}-\\d{4}")) {
+            return profileRepository.findByMemberId(input.toUpperCase())
+                    .map(MemberProfile::getUser)
+                    .orElseThrow(() -> new ResourceNotFoundException("No account found"));
+        }
+        // 3. Full name (case-insensitive)
+        return userRepository.findByFullNameIgnoreCase(input)
+                .orElseThrow(() -> new ResourceNotFoundException("No account found"));
     }
 
     // ── Refresh ───────────────────────────────────────────────────────────────
