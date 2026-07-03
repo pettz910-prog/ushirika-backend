@@ -79,6 +79,15 @@ public class User extends BaseEntity implements UserDetails {
     @Builder.Default
     private boolean active = true;
 
+    /**
+     * Set by the attendance engine when a member misses two consecutive
+     * quarterly meetings. Distinct from suspension (admin action).
+     * When true, active is also set to false to block login.
+     */
+    @Column(name = "membership_ceased", nullable = false)
+    @Builder.Default
+    private boolean membershipCeased = false;
+
     // ── UserDetails ───────────────────────────────────────────────────────────
 
     @Override

@@ -26,8 +26,9 @@ public record UserProfileDto(
         OfficialTitle officialTitle,
         boolean emailVerified,
         boolean active,
-        /** "pending" | "active" | "suspended" */
+        /** "pending" | "active" | "suspended" | "ceased" */
         String status,
+        boolean membershipCeased,
         /** "Standard" | "Family" | "Patron" */
         String tier,
         /** ISO date string (YYYY-MM-DD) — null until membership is approved. */
@@ -45,7 +46,9 @@ public record UserProfileDto(
         String photoUrl  = profile != null ? profile.getPhotoUrl()       : null;
 
         String status;
-        if (!user.isActive()) {
+        if (user.isMembershipCeased()) {
+            status = "ceased";
+        } else if (!user.isActive()) {
             status = "suspended";
         } else if (user.getRole() != UserRole.MEMBER || memberId != null) {
             // non-member staff and fully-approved members are active
@@ -69,6 +72,7 @@ public record UserProfileDto(
                 user.isEmailVerified(),
                 user.isActive(),
                 status,
+                user.isMembershipCeased(),
                 tier,
                 joined,
                 city,

@@ -1,0 +1,19 @@
+package com.mdau.ushirika.module.attendance.repository;
+
+import com.mdau.ushirika.module.attendance.entity.Meeting;
+import com.mdau.ushirika.module.attendance.enums.MeetingStatus;
+import com.mdau.ushirika.module.attendance.enums.MeetingType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.UUID;
+
+public interface MeetingRepository extends JpaRepository<Meeting, UUID> {
+
+    Page<Meeting> findAllByOrderByMeetingDateDesc(Pageable pageable);
+
+    /** Returns the two most recent completed quarterly-type meetings for consecutive-absence checking. */
+    List<Meeting> findTop2ByTypeInAndStatusOrderByMeetingDateDesc(List<MeetingType> types, MeetingStatus status);
+}
