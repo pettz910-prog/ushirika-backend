@@ -1,0 +1,17 @@
+package com.mdau.ushirika.module.constitution.repository;
+
+import com.mdau.ushirika.module.constitution.entity.GoverningDocument;
+import com.mdau.ushirika.module.constitution.enums.DocumentStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.UUID;
+
+public interface GoverningDocumentRepository extends JpaRepository<GoverningDocument, UUID> {
+
+    /** Public listing — published documents ordered by sort_order then created_at. */
+    List<GoverningDocument> findAllByStatusOrderBySortOrderAscCreatedAtDesc(DocumentStatus status);
+
+    /** Admin listing — all documents ordered by sort_order then created_at. */
+    List<GoverningDocument> findAllByOrderBySortOrderAscCreatedAtDesc();
+}

@@ -86,9 +86,21 @@ public class MembershipService {
         profile.setGender(req.gender());
         profile.setAddress(req.address());
         profile.setCounty(req.county());
+        profile.setMaritalStatus(req.maritalStatus());
+        profile.setSpouseName(req.spouseName());
+        profile.setChildrenJson(serializeChildren(req.children()));
         profile.setNextOfKinName(req.nextOfKinName());
         profile.setNextOfKinPhone(req.nextOfKinPhone());
         profile.setNextOfKinRelationship(req.nextOfKinRelationship());
+        profile.setEmergencyContactName(req.emergencyContactName());
+        profile.setEmergencyContactPhone(req.emergencyContactPhone());
+        profile.setOccupation(req.occupation());
+        profile.setEmployer(req.employer());
+        profile.setReference1Name(req.reference1Name());
+        profile.setReference1MemberId(req.reference1MemberId());
+        profile.setReference2Name(req.reference2Name());
+        profile.setReference2MemberId(req.reference2MemberId());
+        profile.setHeardAboutUs(req.heardAboutUs());
         profileRepository.save(profile);
 
         MembershipApplication application = applicationRepository.findByUser(user)
@@ -277,5 +289,19 @@ public class MembershipService {
         int year = LocalDate.now().getYear();
         long sequence = profileRepository.countByMemberIdNotNull() + 1;
         return "UW-%d-%04d".formatted(year, sequence);
+    }
+
+    private String serializeChildren(java.util.List<MembershipApplicationRequest.ChildRecord> children) {
+        if (children == null || children.isEmpty()) return "[]";
+        var sb = new StringBuilder("[");
+        for (int i = 0; i < children.size(); i++) {
+            var c = children.get(i);
+            if (i > 0) sb.append(",");
+            sb.append("{\"name\":\"").append(c.name() == null ? "" : c.name().replace("\"", "\\\""))
+              .append("\",\"dateOfBirth\":\"").append(c.dateOfBirth() == null ? "" : c.dateOfBirth())
+              .append("\"}");
+        }
+        sb.append("]");
+        return sb.toString();
     }
 }
