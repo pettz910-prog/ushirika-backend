@@ -130,21 +130,28 @@ public class AuthService {
 
     // ── Resolve user from flexible username ───────────────────────────────────
 
-    private User resolveUser(String input) {
+    private User resolveUser(String raw) {
+        // Collapse any runs of whitespace a user might type accidentally
+        String input = raw.trim().replaceAll("\\s+", " ");
+
         // 1. Email
         if (input.contains("@")) {
             return userRepository.findByEmail(input.toLowerCase())
-                    .orElseThrow(() -> new ResourceNotFoundException("No account found"));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "No account found for that email address. Check for a typo or use your member ID."));
         }
-        // 2. Member ID  (UW-YYYY-XXXX, case-insensitive)
+        // 2. Member ID (UW-YYYY-XXXX, case-insensitive)
         if (input.toUpperCase().matches("UW-\\d{4}-\\d{4}")) {
             return profileRepository.findByMemberId(input.toUpperCase())
                     .map(MemberProfile::getUser)
-                    .orElseThrow(() -> new ResourceNotFoundException("No account found"));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "No account found for member ID " + input.toUpperCase()
+                            + ". Contact the administrator if you believe this is an error."));
         }
-        // 3. Full name (case-insensitive)
+        // 3. Full name — case-insensitive, accepts "First Last" or "Last First"
         return userRepository.findByFullNameIgnoreCase(input)
-                .orElseThrow(() -> new ResourceNotFoundException("No account found"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No account found matching that name. Try your email or member ID (UW-YYYY-XXXX) instead."));
     }
 
     // ── Refresh ───────────────────────────────────────────────────────────────

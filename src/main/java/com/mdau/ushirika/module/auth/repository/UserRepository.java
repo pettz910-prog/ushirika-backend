@@ -26,6 +26,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     long countByRole(UserRole role);
 
-    @Query("SELECT u FROM User u WHERE LOWER(CONCAT(u.firstName, ' ', u.lastName)) = LOWER(:fullName)")
+    // Matches "First Last" or "Last First" — handles reversed entry and any casing.
+    @Query("SELECT u FROM User u WHERE " +
+           "LOWER(CONCAT(u.firstName, ' ', u.lastName)) = LOWER(:fullName) OR " +
+           "LOWER(CONCAT(u.lastName, ' ', u.firstName)) = LOWER(:fullName)")
     Optional<User> findByFullNameIgnoreCase(@Param("fullName") String fullName);
 }
