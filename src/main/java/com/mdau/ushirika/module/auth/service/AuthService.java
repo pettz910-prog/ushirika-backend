@@ -245,6 +245,42 @@ public class AuthService {
         );
     }
 
+    // ── Update credentials (email and/or password) ────────────────────────────
+
+    @Transactional
+    public void updateCredentials(UpdateCredentialsRequest req) {
+        if ((req.newEmail() == null || req.newEmail().isBlank()) &&
+            (req.newPassword() == null || req.newPassword().isBlank())) {
+            throw new BadRequestException("Provide a new email, a new password, or both");
+        }
+
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = findByEmail(email);
+
+        if (!passwordEncoder.matches(req.currentPassword(), user.getPassword())) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+
+        if (req.newEmail() != null && !req.newEmail().isBlank()) {
+            String normalised = req.newEmail().trim().toLowerCase();
+            if (!normalised.equals(user.getEmail()) && userRepository.existsByEmail(normalised)) {
+                throw new ConflictException("An account with that email already exists");
+            }
+            user.setEmail(normalised);
+        }
+
+        if (req.newPassword() != null && !req.newPassword().isBlank()) {
+            if (passwordEncoder.matches(req.newPassword(), user.getPassword())) {
+                throw new BadRequestException("New password must be different from the current password");
+            }
+            user.setPassword(passwordEncoder.encode(req.newPassword()));
+        }
+
+        userRepository.save(user);
+        refreshTokenRepository.revokeAllUserTokens(user);
+        log.info("Credentials updated for user: {}", email);
+    }
+
     // ── Change password (authenticated) ───────────────────────────────────────
 
     @Transactional
