@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -44,7 +45,7 @@ public class BenevolenceBeneficiary extends BaseEntity {
     private boolean deceased = false;
 
     @Column(name = "deceased_at")
-    private LocalDate deceasedAt;
+    private LocalDateTime deceasedAt;
 
     /** Admin notes on any beneficiary update (audit trail). */
     @Column(name = "admin_notes", length = 500)
