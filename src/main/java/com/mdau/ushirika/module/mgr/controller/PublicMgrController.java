@@ -24,6 +24,6 @@ public class PublicMgrController {
     public ResponseEntity<ApiResponse<MgrCycleDto>> getActiveCycle() {
         Optional<MgrCycleDto> dto = mgrService.getActiveCyclePublicInfo();
         return dto.map(d -> ResponseEntity.ok(ApiResponse.ok(d)))
-                .orElseGet(() -> ResponseEntity.ok(ApiResponse.<MgrCycleDto>ok(null)));
+                .orElseGet(() -> ResponseEntity.ok(ApiResponse.ok((MgrCycleDto) null)));
     }
 }
