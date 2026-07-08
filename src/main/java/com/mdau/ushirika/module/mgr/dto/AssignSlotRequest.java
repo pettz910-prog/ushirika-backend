@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public record AssignSlotRequest(
         @NotNull UUID userId,
-        @NotNull @Min(1) @Max(24) Integer slotNumber
+        @Min(1) @Max(200) Integer slotNumber
 ) {}
