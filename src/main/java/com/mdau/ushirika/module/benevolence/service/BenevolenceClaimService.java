@@ -35,6 +35,7 @@ public class BenevolenceClaimService {
     private final BenevolenceBeneficiaryRepository beneficiaryRepo;
     private final BenevolenceReplenishmentRepository replenishmentRepo;
     private final ReplenishmentPaymentRepository replenPaymentRepo;
+    private final BenevolenceClaimCategoryRepository categoryRepo;
     private final MemberProfileRepository profileRepo;
     private final UserRepository userRepo;
 
@@ -63,9 +64,20 @@ public class BenevolenceClaimService {
                             "Beneficiary not found or does not belong to your enrollment."));
         }
 
+        BenevolenceClaimCategory category = null;
+        if (req.categoryId() != null) {
+            category = categoryRepo.findById(req.categoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Claim category not found: " + req.categoryId()));
+            if (!category.isActive()) {
+                throw new BadRequestException("This claim category is no longer available.");
+            }
+        }
+
         BenevolenceClaim claim = BenevolenceClaim.builder()
                 .enrollment(enrollment)
                 .beneficiary(beneficiary)
+                .category(category)
                 .referenceNumber(generateRef())
                 .deceasedName(req.deceasedName())
                 .relationship(req.relationship())

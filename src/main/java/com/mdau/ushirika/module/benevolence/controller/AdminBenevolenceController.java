@@ -5,6 +5,7 @@ import com.mdau.ushirika.common.response.PagedResponse;
 import com.mdau.ushirika.module.benevolence.dto.*;
 import com.mdau.ushirika.module.benevolence.enums.ClaimStatus;
 import com.mdau.ushirika.module.benevolence.enums.EnrollmentStatus;
+import com.mdau.ushirika.module.benevolence.service.BenevolenceClaimCategoryService;
 import com.mdau.ushirika.module.benevolence.service.BenevolenceClaimService;
 import com.mdau.ushirika.module.benevolence.service.BenevolenceEnrollmentService;
 import jakarta.validation.Valid;
@@ -24,6 +25,7 @@ public class AdminBenevolenceController {
 
     private final BenevolenceEnrollmentService enrollmentService;
     private final BenevolenceClaimService claimService;
+    private final BenevolenceClaimCategoryService categoryService;
 
     // ── Enrollments ───────────────────────────────────────────────────────────
 
@@ -143,5 +145,36 @@ public class AdminBenevolenceController {
         String reason = body != null ? body.get("reason") : null;
         return ResponseEntity.ok(ApiResponse.ok("Payment waived",
                 claimService.waiveReplenishmentPayment(paymentId, reason)));
+    }
+
+    // ── Claim Categories ──────────────────────────────────────────────────────
+
+    @GetMapping("/claim-categories")
+    public ResponseEntity<ApiResponse<java.util.List<ClaimCategoryDto>>> listCategories() {
+        return ResponseEntity.ok(ApiResponse.ok(categoryService.listAll()));
+    }
+
+    @PostMapping("/claim-categories")
+    public ResponseEntity<ApiResponse<ClaimCategoryDto>> createCategory(
+            @Valid @RequestBody SaveClaimCategoryRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Category created", categoryService.create(req)));
+    }
+
+    @PutMapping("/claim-categories/{id}")
+    public ResponseEntity<ApiResponse<ClaimCategoryDto>> updateCategory(
+            @PathVariable UUID id,
+            @Valid @RequestBody SaveClaimCategoryRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Category updated", categoryService.update(id, req)));
+    }
+
+    @PatchMapping("/claim-categories/{id}/toggle")
+    public ResponseEntity<ApiResponse<ClaimCategoryDto>> toggleCategory(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok("Category toggled", categoryService.toggleActive(id)));
+    }
+
+    @DeleteMapping("/claim-categories/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable UUID id) {
+        categoryService.delete(id);
+        return ResponseEntity.ok(ApiResponse.ok("Category deleted"));
     }
 }

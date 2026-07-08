@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record SubmitClaimRequest(
+        UUID categoryId,
         UUID beneficiaryId,
         @NotBlank String deceasedName,
         @NotBlank String relationship,

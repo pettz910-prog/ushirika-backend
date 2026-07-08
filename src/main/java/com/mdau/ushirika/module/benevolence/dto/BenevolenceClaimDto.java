@@ -16,6 +16,8 @@ public record BenevolenceClaimDto(
         String memberId,
         UUID beneficiaryId,
         String beneficiaryName,
+        UUID categoryId,
+        String categoryName,
         String referenceNumber,
         String deceasedName,
         String relationship,
@@ -41,10 +43,13 @@ public record BenevolenceClaimDto(
         UUID beneficiaryId = c.getBeneficiary() != null ? c.getBeneficiary().getId() : null;
         String beneficiaryName = c.getBeneficiary() != null
                 ? c.getBeneficiary().getFirstName() + " " + c.getBeneficiary().getLastName() : null;
+        UUID categoryId   = c.getCategory() != null ? c.getCategory().getId() : null;
+        String categoryName = c.getCategory() != null ? c.getCategory().getName() : null;
 
         return new BenevolenceClaimDto(
                 c.getId(), c.getEnrollment().getId(), fullName, memberId,
-                beneficiaryId, beneficiaryName, c.getReferenceNumber(),
+                beneficiaryId, beneficiaryName, categoryId, categoryName,
+                c.getReferenceNumber(),
                 c.getDeceasedName(), c.getRelationship(), c.getDateOfDeath(),
                 c.getLocationOfDeath(), c.getFuneralDate(), c.getFuneralLocation(),
                 c.getContactName(), c.getContactPhone(), c.getDescription(),

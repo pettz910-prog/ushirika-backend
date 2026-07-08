@@ -38,6 +38,11 @@ public class BenevolenceClaim extends BaseEntity {
                 foreignKey = @ForeignKey(name = "fk_claim_beneficiary"))
     private BenevolenceBeneficiary beneficiary;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id",
+                foreignKey = @ForeignKey(name = "fk_claim_category"))
+    private BenevolenceClaimCategory category;
+
     @Column(name = "reference_number", unique = true, nullable = false, updatable = false, length = 30)
     private String referenceNumber;
 
