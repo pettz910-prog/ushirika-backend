@@ -2,6 +2,7 @@ package com.mdau.ushirika.module.mgr.controller;
 
 import com.mdau.ushirika.common.response.ApiResponse;
 import com.mdau.ushirika.module.mgr.dto.*;
+import com.mdau.ushirika.module.mgr.enums.JoinRequestStatus;
 import com.mdau.ushirika.module.mgr.service.MgrService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +58,56 @@ public class AdminMgrController {
     @PostMapping("/cycles/{id}/cancel")
     public ResponseEntity<ApiResponse<MgrCycleDto>> cancelCycle(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok("Cycle cancelled", mgrService.cancelCycle(id)));
+    }
+
+    /** Open or close enrollment for a cycle. */
+    @PatchMapping("/cycles/{id}/enrollment")
+    public ResponseEntity<ApiResponse<MgrCycleDto>> toggleEnrollment(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok("Enrollment toggled", mgrService.toggleEnrollment(id)));
+    }
+
+    // ── Join Requests ─────────────────────────────────────────────────────────
+
+    @GetMapping("/cycles/{cycleId}/join-requests")
+    public ResponseEntity<ApiResponse<List<MgrJoinRequestDto>>> listJoinRequests(
+            @PathVariable UUID cycleId,
+            @RequestParam(required = false) JoinRequestStatus status) {
+        return ResponseEntity.ok(ApiResponse.ok(mgrService.listJoinRequests(cycleId, status)));
+    }
+
+    @PostMapping("/join-requests/{requestId}/approve")
+    public ResponseEntity<ApiResponse<MgrJoinRequestDto>> approveJoinRequest(
+            @PathVariable UUID requestId,
+            @RequestBody(required = false) RespondJoinRequest req) {
+        String notes = req != null ? req.adminNotes() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Join request approved",
+                mgrService.approveJoinRequest(requestId, notes)));
+    }
+
+    @PostMapping("/join-requests/{requestId}/reject")
+    public ResponseEntity<ApiResponse<MgrJoinRequestDto>> rejectJoinRequest(
+            @PathVariable UUID requestId,
+            @RequestBody(required = false) RespondJoinRequest req) {
+        String notes = req != null ? req.adminNotes() : null;
+        return ResponseEntity.ok(ApiResponse.ok("Join request rejected",
+                mgrService.rejectJoinRequest(requestId, notes)));
+    }
+
+    // ── Monthly Draw ──────────────────────────────────────────────────────────
+
+    @PostMapping("/cycles/{cycleId}/draw")
+    public ResponseEntity<ApiResponse<List<MgrSlotDto>>> runMonthlyDraw(
+            @PathVariable UUID cycleId,
+            @Valid @RequestBody RunMonthlyDrawRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Monthly draw completed",
+                mgrService.runMonthlyDraw(cycleId, req.month(), req.year())));
+    }
+
+    @GetMapping("/cycles/{cycleId}/beneficiaries/{month}")
+    public ResponseEntity<ApiResponse<List<MgrSlotDto>>> getBeneficiaries(
+            @PathVariable UUID cycleId,
+            @PathVariable int month) {
+        return ResponseEntity.ok(ApiResponse.ok(mgrService.getCurrentBeneficiaries(cycleId, month)));
     }
 
     // ── Slots ─────────────────────────────────────────────────────────────────

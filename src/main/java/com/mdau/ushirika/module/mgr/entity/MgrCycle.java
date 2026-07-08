@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,25 +40,50 @@ public class MgrCycle extends BaseEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
-    /** Fixed: 24 */
+    /** Max members in this cycle (default 24). */
     @Column(name = "total_slots", nullable = false)
     @Builder.Default
     private int totalSlots = 24;
 
-    /** $100 per member per month. */
+    /** Monthly contribution per member. */
     @Column(name = "monthly_contribution", nullable = false, precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal monthlyContribution = new BigDecimal("100.00");
 
-    /** 2 payouts per month. Each payout = totalSlots × monthly / payoutsPerMonth. */
+    /** How many members receive payout per monthly draw. */
     @Column(name = "payouts_per_month", nullable = false)
     @Builder.Default
     private int payoutsPerMonth = 2;
 
-    /** $1,200 per slot payout (24 × 100 / 2). Stored explicitly for flexibility. */
+    /**
+     * Fixed payout amount per beneficiary per draw.
+     * Admin sets this freely — need not equal (totalSlots × monthly / payoutsPerMonth).
+     * The remainder stays in the cycle reserve fund.
+     */
     @Column(name = "payout_amount_per_slot", nullable = false, precision = 10, scale = 2)
     @Builder.Default
     private BigDecimal payoutAmountPerSlot = new BigDecimal("1200.00");
+
+    /**
+     * Percentage of each month's pool retained as a reserve (0–100).
+     * Informational for display — actual deduction depends on admin payout decisions.
+     */
+    @Column(name = "reserve_percentage", precision = 5, scale = 2)
+    @Builder.Default
+    private BigDecimal reservePercentage = BigDecimal.ZERO;
+
+    /**
+     * Day of month (1–28) on which the monthly beneficiary draw is run.
+     * Admin triggers the draw manually on or around this day.
+     */
+    @Column(name = "benefit_payout_day")
+    @Builder.Default
+    private int benefitPayoutDay = 15;
+
+    /** Whether new join requests are currently accepted for this cycle. */
+    @Column(name = "enrollment_open", nullable = false)
+    @Builder.Default
+    private boolean enrollmentOpen = false;
 
     @Column(length = 500)
     private String notes;
@@ -68,10 +94,10 @@ public class MgrCycle extends BaseEntity {
     private CycleStatus status = CycleStatus.DRAFT;
 
     @Column(name = "activated_at")
-    private java.time.LocalDateTime activatedAt;
+    private LocalDateTime activatedAt;
 
     @Column(name = "completed_at")
-    private java.time.LocalDateTime completedAt;
+    private LocalDateTime completedAt;
 
     @OneToMany(mappedBy = "cycle", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
