@@ -63,6 +63,6 @@ public class PortalElectionController {
             @Valid @RequestBody CastVoteRequest req,
             @AuthenticationPrincipal User user) {
         String msg = electionService.castVote(electionId, user.getId(), req);
-        return ResponseEntity.ok(ApiResponse.<String>ok(msg));
+        return ResponseEntity.ok(ApiResponse.ok("Vote recorded", msg));
     }
 }
