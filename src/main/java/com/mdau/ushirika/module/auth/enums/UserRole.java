@@ -5,6 +5,7 @@ package com.mdau.ushirika.module.auth.enums;
  * ADMIN             — Approving official (Secretary General, Treasurer, etc.). All must approve for APPROVED state.
  * FINANCIAL_ADMIN   — Manages all manual payments. Can record, approve/reject, and delegate capabilities to officials.
  * FINANCIAL_OFFICIAL — Can record manual payments. Approval/rejection rights are individually delegated by FINANCIAL_ADMIN.
+ * LEADERSHIP        — Read-only view of all admin data. Cannot mutate any records. Assigned to org leadership observers.
  * MEMBER            — Regular or official member. Can apply, pay, RSVP. May hold an OfficialTitle without approval power.
  */
 public enum UserRole {
@@ -12,5 +13,6 @@ public enum UserRole {
     ADMIN,
     FINANCIAL_ADMIN,
     FINANCIAL_OFFICIAL,
+    LEADERSHIP,
     MEMBER
 }

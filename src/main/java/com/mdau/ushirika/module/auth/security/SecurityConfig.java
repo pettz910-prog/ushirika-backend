@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -52,7 +53,9 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_ROUTES).permitAll()
                         // Superadmin-only: user role management
                         .requestMatchers("/superadmin/**").hasRole("SUPERADMIN")
-                        // Admin + Superadmin: approval queues, dashboards
+                        // Leadership (read-only): full GET access to admin data, no mutations
+                        .requestMatchers(HttpMethod.GET, "/admin/**").hasAnyRole("ADMIN", "SUPERADMIN", "LEADERSHIP")
+                        // Admin + Superadmin: all other (mutating) admin operations
                         .requestMatchers("/admin/**").hasAnyRole("ADMIN", "SUPERADMIN")
                         // Financial admin delegation management (must be before /financial/**)
                         .requestMatchers("/financial/admin/**").hasRole("FINANCIAL_ADMIN")

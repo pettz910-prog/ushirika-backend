@@ -3,6 +3,7 @@ package com.mdau.ushirika.module.dues.service;
 import com.mdau.ushirika.common.exception.BadRequestException;
 import com.mdau.ushirika.common.exception.ResourceNotFoundException;
 import com.mdau.ushirika.common.response.PagedResponse;
+import com.mdau.ushirika.module.audit.service.AuditLogService;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
 import com.mdau.ushirika.module.dues.dto.MembershipDueDto;
@@ -38,6 +39,7 @@ public class MembershipDuesService {
     private final MembershipDueRepository dueRepository;
     private final MemberProfileRepository profileRepository;
     private final UserRepository userRepository;
+    private final AuditLogService auditLogService;
 
     // ── Called on member approval ─────────────────────────────────────────────
 
@@ -99,7 +101,10 @@ public class MembershipDuesService {
         dueRepository.save(due);
 
         log.info("Dues paid: user={} year={} method={}", user.getId(), req.year(), req.paymentMethod());
-        return MembershipDueDto.from(due, memberId(user));
+        MembershipDueDto dto = MembershipDueDto.from(due, memberId(user));
+        auditLogService.log(currentUser(), "DUES_RECORDED", "MembershipDue", due.getId(),
+                String.format("Dues recorded for %s — year %d via %s", user.getFullName(), req.year(), req.paymentMethod()));
+        return dto;
     }
 
     @Transactional
@@ -111,6 +116,8 @@ public class MembershipDuesService {
         due.setStatus(DuesStatus.WAIVED);
         due.setNotes(req != null && req.reason() != null ? req.reason() : due.getNotes());
         dueRepository.save(due);
+        auditLogService.log(currentUser(), "DUES_WAIVED", "MembershipDue", due.getId(),
+                "Waived dues for " + due.getUser().getFullName() + " — year " + due.getYear());
         return MembershipDueDto.from(due, memberId(due.getUser()));
     }
 

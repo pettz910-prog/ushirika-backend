@@ -9,6 +9,7 @@ import com.mdau.ushirika.module.attendance.entity.Meeting;
 import com.mdau.ushirika.module.attendance.enums.FineStatus;
 import com.mdau.ushirika.module.attendance.repository.FineRepository;
 import com.mdau.ushirika.module.attendance.repository.MeetingRepository;
+import com.mdau.ushirika.module.audit.service.AuditLogService;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
 import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
@@ -33,6 +34,7 @@ public class FineService {
     private final UserRepository userRepository;
     private final MeetingRepository meetingRepository;
     private final MemberProfileRepository profileRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public FineDto createFine(CreateFineRequest req) {
@@ -53,7 +55,10 @@ public class FineService {
                 .dueDate(req.dueDate())
                 .build();
 
-        return FineDto.from(fineRepository.save(fine), memberIdOf(user.getId()));
+        FineDto dto = FineDto.from(fineRepository.save(fine), memberIdOf(user.getId()));
+        auditLogService.log(currentUser(), "FINE_CREATED", "Fine", dto.id(),
+                String.format("Fine of $%.2f issued to %s — %s", req.amount(), user.getFullName(), req.reason()));
+        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -95,7 +100,10 @@ public class FineService {
         }
         fine.setStatus(FineStatus.WAIVED);
         fine.setWaivedReason(reason);
-        return FineDto.from(fineRepository.save(fine), memberIdOf(fine.getUser().getId()));
+        FineDto dto = FineDto.from(fineRepository.save(fine), memberIdOf(fine.getUser().getId()));
+        auditLogService.log(currentUser(), "FINE_WAIVED", "Fine", id,
+                "Waived fine for " + fine.getUser().getFullName() + " — " + fine.getReason());
+        return dto;
     }
 
     @Transactional

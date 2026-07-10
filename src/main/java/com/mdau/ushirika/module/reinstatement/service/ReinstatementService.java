@@ -4,6 +4,7 @@ import com.mdau.ushirika.common.exception.BadRequestException;
 import com.mdau.ushirika.common.exception.ResourceNotFoundException;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
+import com.mdau.ushirika.module.audit.service.AuditLogService;
 import com.mdau.ushirika.module.notification.enums.InAppNotificationCategory;
 import com.mdau.ushirika.module.notification.service.EmailService;
 import com.mdau.ushirika.module.notification.service.InAppNotificationService;
@@ -35,6 +36,7 @@ public class ReinstatementService {
     private final EmailService                   emailService;
     private final SmsService                     smsService;
     private final InAppNotificationService       notificationService;
+    private final AuditLogService                auditLogService;
 
     // ── Member ────────────────────────────────────────────────────────────────
 
@@ -121,6 +123,8 @@ public class ReinstatementService {
                 "/portal"
         );
 
+        auditLogService.log(admin, "REINSTATEMENT_APPROVED", "ReinstatementRequest", id,
+                "Approved reinstatement for " + member.getFullName() + " (" + member.getEmail() + ")");
         log.info("ReinstatementService: approved request {} for user {}", id, member.getEmail());
         return ReinstatementRequestDto.from(request);
     }
@@ -166,6 +170,8 @@ public class ReinstatementService {
                 "/portal"
         );
 
+        auditLogService.log(admin, "REINSTATEMENT_REJECTED", "ReinstatementRequest", id,
+                "Rejected reinstatement for " + member.getFullName() + " (" + member.getEmail() + ")");
         log.info("ReinstatementService: rejected request {} for user {}", id, member.getEmail());
         return ReinstatementRequestDto.from(request);
     }
