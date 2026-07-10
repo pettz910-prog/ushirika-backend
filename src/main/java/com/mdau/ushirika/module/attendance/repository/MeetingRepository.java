@@ -19,4 +19,6 @@ public interface MeetingRepository extends JpaRepository<Meeting, UUID> {
     List<Meeting> findTop2ByTypeInAndStatusOrderByMeetingDateDesc(List<MeetingType> types, MeetingStatus status);
 
     List<Meeting> findByStatusAndMeetingDateBetween(MeetingStatus status, LocalDateTime from, LocalDateTime to);
+
+    List<Meeting> findAllByStatusOrderByMeetingDateAsc(MeetingStatus status);
 }
