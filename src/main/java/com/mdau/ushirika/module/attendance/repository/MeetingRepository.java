@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,4 +17,6 @@ public interface MeetingRepository extends JpaRepository<Meeting, UUID> {
 
     /** Returns the two most recent completed quarterly-type meetings for consecutive-absence checking. */
     List<Meeting> findTop2ByTypeInAndStatusOrderByMeetingDateDesc(List<MeetingType> types, MeetingStatus status);
+
+    List<Meeting> findByStatusAndMeetingDateBetween(MeetingStatus status, LocalDateTime from, LocalDateTime to);
 }

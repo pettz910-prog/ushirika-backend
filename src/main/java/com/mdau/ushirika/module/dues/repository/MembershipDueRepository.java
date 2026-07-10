@@ -30,4 +30,6 @@ public interface MembershipDueRepository extends JpaRepository<MembershipDue, UU
 
     @Query("SELECT d FROM MembershipDue d WHERE d.status = 'PENDING' AND d.dueDate < :today")
     List<MembershipDue> findOverdue(@Param("today") LocalDate today);
+
+    List<MembershipDue> findByStatusAndDueDate(DuesStatus status, LocalDate dueDate);
 }

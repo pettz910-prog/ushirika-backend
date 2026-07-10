@@ -19,4 +19,6 @@ public interface FineRepository extends JpaRepository<Fine, UUID> {
     List<Fine> findByUserOrderByCreatedAtDesc(User user);
 
     List<Fine> findByUserAndStatusOrderByDueDateAsc(User user, FineStatus status);
+
+    List<Fine> findByStatusAndDueDate(FineStatus status, java.time.LocalDate dueDate);
 }
