@@ -32,4 +32,7 @@ public interface MembershipDueRepository extends JpaRepository<MembershipDue, UU
     List<MembershipDue> findOverdue(@Param("today") LocalDate today);
 
     List<MembershipDue> findByStatusAndDueDate(DuesStatus status, LocalDate dueDate);
+
+    /** Calendar query: dues for a user with due date within [from, to]. */
+    List<MembershipDue> findByUserAndDueDateBetween(User user, LocalDate from, LocalDate to);
 }

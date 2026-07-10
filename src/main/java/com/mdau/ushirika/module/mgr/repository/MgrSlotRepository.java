@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +29,9 @@ public interface MgrSlotRepository extends JpaRepository<MgrSlot, UUID> {
 
     /** Slots drawn for a specific payout month (payoutMonth is now nullable). */
     List<MgrSlot> findByCycleAndPayoutMonth(MgrCycle cycle, Integer payoutMonth);
+
+    /** Calendar query: drawn slots for a user with payout date within [from, to]. */
+    List<MgrSlot> findAllByUserAndScheduledPayoutDateBetween(User user, LocalDate from, LocalDate to);
 
     /** All SCHEDULED slots with no payout month yet — candidates for monthly draw. */
     @Query("SELECT s FROM MgrSlot s WHERE s.cycle = :cycle AND s.status = :status AND s.payoutMonth IS NULL")

@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public interface EventRepository extends JpaRepository<Event, UUID> {
@@ -23,6 +25,13 @@ public interface EventRepository extends JpaRepository<Event, UUID> {
     Page<Event> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     long countByStatus(EventStatus status);
+
+    /** Calendar query: events with given statuses whose start falls within [from, to]. */
+    @Query("SELECT e FROM Event e WHERE e.status IN :statuses AND e.startDateTime >= :from AND e.startDateTime <= :to ORDER BY e.startDateTime ASC")
+    List<Event> findByStatusInAndStartDateTimeBetween(
+            @Param("statuses") List<EventStatus> statuses,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to);
 
     /** Count confirmed attendees for capacity enforcement. */
     @Query("""

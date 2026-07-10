@@ -21,4 +21,7 @@ public interface FineRepository extends JpaRepository<Fine, UUID> {
     List<Fine> findByUserAndStatusOrderByDueDateAsc(User user, FineStatus status);
 
     List<Fine> findByStatusAndDueDate(FineStatus status, java.time.LocalDate dueDate);
+
+    /** Calendar query: pending fines for a user with due date within [from, to]. */
+    List<Fine> findByUserAndStatusAndDueDateBetween(User user, FineStatus status, java.time.LocalDate from, java.time.LocalDate to);
 }
