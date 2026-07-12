@@ -19,6 +19,7 @@ import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import com.mdau.ushirika.module.dues.service.MembershipDuesService;
 import com.mdau.ushirika.module.notification.service.EmailService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +30,7 @@ import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminUserService {
@@ -167,7 +169,11 @@ public class AdminUserService {
         profileRepository.save(profile);
         membershipDuesService.createInitialDues(user);
 
-        sendWelcomeCredentials(user.getEmail(), user.getFirstName(), memberId, tempPassword);
+        try {
+            sendWelcomeCredentials(user.getEmail(), user.getFirstName(), memberId, tempPassword);
+        } catch (Exception e) {
+            log.warn("Welcome email failed for {} — account created, credentials must be shared manually: {}", user.getEmail(), e.getMessage());
+        }
 
         return UserProfileDto.from(user, profile);
     }
