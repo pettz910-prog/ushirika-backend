@@ -2,7 +2,7 @@ package com.mdau.ushirika.module.member.controller;
 
 import com.mdau.ushirika.common.response.ApiResponse;
 import com.mdau.ushirika.common.response.PagedResponse;
-import com.mdau.ushirika.module.auth.dto.UserDto;
+import com.mdau.ushirika.module.auth.dto.UserProfileDto;
 import com.mdau.ushirika.module.member.service.AdminUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,12 +28,12 @@ public class AdminMembersController {
     private final AdminUserService adminUserService;
 
     @GetMapping
-    @Operation(summary = "List all users (paginated) — accessible to ADMIN and SUPERADMIN")
-    public ResponseEntity<ApiResponse<PagedResponse<UserDto>>> list(
+    @Operation(summary = "List all users with profile — accessible to ADMIN and SUPERADMIN")
+    public ResponseEntity<ApiResponse<PagedResponse<UserProfileDto>>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "200") int size
     ) {
         return ResponseEntity.ok(ApiResponse.ok("Members retrieved",
-                adminUserService.listUsers(PageRequest.of(page, size, Sort.by("createdAt").descending()))));
+                adminUserService.listMembersWithProfile(PageRequest.of(page, size, Sort.by("createdAt").descending()))));
     }
 }

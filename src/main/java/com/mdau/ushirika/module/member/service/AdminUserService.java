@@ -47,6 +47,14 @@ public class AdminUserService {
     }
 
     @Transactional(readOnly = true)
+    public PagedResponse<UserProfileDto> listMembersWithProfile(Pageable pageable) {
+        return PagedResponse.of(userRepository.findAll(pageable).map(user -> {
+            MemberProfile profile = profileRepository.findByUser(user).orElse(null);
+            return UserProfileDto.from(user, profile);
+        }));
+    }
+
+    @Transactional(readOnly = true)
     public UserDto getUser(UUID userId) {
         return UserDto.from(findById(userId));
     }

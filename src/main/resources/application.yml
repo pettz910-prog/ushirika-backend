@@ -28,6 +28,8 @@ spring:
         format_sql: false
         use_sql_comments: false
         generate_statistics: false
+        hbm2ddl:
+          halt_on_error: false
         jdbc:
           time_zone: UTC
           batch_size: 20
