@@ -148,14 +148,15 @@ public class AdminUserService {
                 .build();
 
         log.info("[createMember] saving User");
-        userRepository.save(user);
+        user = userRepository.saveAndFlush(user);
         log.info("[createMember] User saved id={}", user.getId());
 
         String memberId = generateMemberId();
         log.info("[createMember] memberId={}", memberId);
         String tier = (req.tier() != null && !req.tier().isBlank()) ? req.tier() : "Standard";
 
-        String placeholderId = "P-" + user.getId().toString().replace("-", "").substring(0, 18);
+        // Use a random suffix for idNumber placeholder — guaranteed unique, no dependency on user.getId()
+        String placeholderId = "P-" + UUID.randomUUID().toString().replace("-", "").substring(0, 18);
         log.info("[createMember] building MemberProfile placeholderId={}", placeholderId);
         MemberProfile profile = MemberProfile.builder()
                 .user(user)
