@@ -2,6 +2,7 @@ package com.mdau.ushirika.common.exception;
 
 import com.mdau.ushirika.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -77,10 +78,22 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(errors));
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.error("Data integrity violation", ex);
+        String msg = ex.getMostSpecificCause().getMessage();
+        if (msg != null && msg.contains("unique") || msg != null && msg.contains("duplicate")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiResponse.fail("A record with this information already exists."));
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail("Data constraint violation: " + ex.getMostSpecificCause().getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleAll(Exception ex) {
-        log.error("Unhandled exception", ex);
+        log.error("Unhandled exception: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.fail("An unexpected error occurred"));
+                .body(ApiResponse.fail("An unexpected error occurred: " + ex.getClass().getSimpleName()));
     }
 }
