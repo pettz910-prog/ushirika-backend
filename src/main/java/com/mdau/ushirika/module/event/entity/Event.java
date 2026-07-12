@@ -8,6 +8,7 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,6 +72,15 @@ public class Event extends BaseEntity {
     @Column(name = "members_only", nullable = false)
     @Builder.Default
     private boolean membersOnly = false;
+
+    /** True = attendees must pay before their registration is confirmed. */
+    @Column(name = "requires_payment", nullable = false)
+    @Builder.Default
+    private boolean requiresPayment = false;
+
+    /** Ticket / entry fee in USD. Null for free events. */
+    @Column(name = "ticket_price", precision = 10, scale = 2)
+    private BigDecimal ticketPrice;
 
     @Column(name = "cover_image_url", length = 1000)
     private String coverImageUrl;

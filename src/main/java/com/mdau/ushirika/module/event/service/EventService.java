@@ -192,6 +192,8 @@ public class EventService {
                 .registrationDeadline(req.registrationDeadline())
                 .capacity(req.capacity())
                 .membersOnly(req.membersOnly())
+                .requiresPayment(req.requiresPayment())
+                .ticketPrice(req.ticketPrice())
                 .coverImageUrl(req.coverImageUrl())
                 .tags(req.tags() != null ? req.tags() : new ArrayList<>())
                 .build();
@@ -214,6 +216,8 @@ public class EventService {
         event.setRegistrationDeadline(req.registrationDeadline());
         event.setCapacity(req.capacity());
         event.setMembersOnly(req.membersOnly());
+        event.setRequiresPayment(req.requiresPayment());
+        event.setTicketPrice(req.ticketPrice());
         event.setCoverImageUrl(req.coverImageUrl());
         event.setTags(req.tags() != null ? req.tags() : new ArrayList<>());
         return EventDto.from(eventRepository.save(event), countActive(event));

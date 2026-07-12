@@ -1,13 +1,16 @@
 package com.mdau.ushirika.module.attendance.controller;
 
 import com.mdau.ushirika.common.response.ApiResponse;
-import com.mdau.ushirika.module.attendance.dto.CreateFineRequest;
-import com.mdau.ushirika.module.attendance.dto.FineDto;
+import com.mdau.ushirika.common.response.PagedResponse;
+import com.mdau.ushirika.module.attendance.dto.*;
+import com.mdau.ushirika.module.attendance.enums.FinePaymentStatus;
+import com.mdau.ushirika.module.attendance.service.FinePaymentService;
 import com.mdau.ushirika.module.attendance.service.FineService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +25,9 @@ import java.util.UUID;
 public class AdminFineController {
 
     private final FineService fineService;
+    private final FinePaymentService finePaymentService;
+
+    // ── Fines ─────────────────────────────────────────────────────────────────
 
     @GetMapping
     public ApiResponse<Page<FineDto>> list(
@@ -44,7 +50,7 @@ public class AdminFineController {
 
     @PatchMapping("/{id}/waive")
     public ApiResponse<FineDto> waive(@PathVariable UUID id,
-                                       @RequestBody(required = false) Map<String, String> body) {
+                                      @RequestBody(required = false) Map<String, String> body) {
         String reason = body != null ? body.get("reason") : null;
         return ApiResponse.ok("Fine waived.", fineService.waiveFine(id, reason));
     }
@@ -52,5 +58,34 @@ public class AdminFineController {
     @PatchMapping("/{id}/pay")
     public ApiResponse<FineDto> markPaid(@PathVariable UUID id) {
         return ApiResponse.ok("Fine marked as paid.", fineService.markPaid(id));
+    }
+
+    // ── Fine payment submissions (two-sided verification) ─────────────────────
+
+    @GetMapping("/payments")
+    public ResponseEntity<ApiResponse<PagedResponse<FinePaymentDto>>> listPayments(
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "50") int size) {
+        FinePaymentStatus fps = status != null ? FinePaymentStatus.valueOf(status.toUpperCase()) : null;
+        return ResponseEntity.ok(ApiResponse.ok("Fine payment submissions fetched",
+                finePaymentService.listAll(fps,
+                        PageRequest.of(page, size, Sort.by("createdAt").descending()))));
+    }
+
+    @PatchMapping("/payments/{id}/verify")
+    public ResponseEntity<ApiResponse<FinePaymentDto>> verifyPayment(
+            @PathVariable UUID id,
+            @Valid @RequestBody VerifyFinePaymentRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Fine payment verified",
+                finePaymentService.verify(id, req)));
+    }
+
+    @PatchMapping("/payments/{id}/reject")
+    public ResponseEntity<ApiResponse<FinePaymentDto>> rejectPayment(
+            @PathVariable UUID id,
+            @Valid @RequestBody RejectFinePaymentRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Fine payment rejected",
+                finePaymentService.reject(id, req)));
     }
 }

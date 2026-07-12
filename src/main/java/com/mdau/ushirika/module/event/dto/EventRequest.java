@@ -5,7 +5,9 @@ import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -36,6 +38,13 @@ public record EventRequest(
         Integer capacity,
 
         boolean membersOnly,
+
+        /** True = registration requires a payment reference before it is confirmed. */
+        boolean requiresPayment,
+
+        /** Ticket price in USD. Required when requiresPayment is true. */
+        @PositiveOrZero(message = "Ticket price must be zero or positive")
+        BigDecimal ticketPrice,
 
         String coverImageUrl,
 

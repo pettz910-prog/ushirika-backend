@@ -10,6 +10,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import static java.math.BigDecimal.ZERO;
+
 @Entity
 @Table(
     name = "membership_dues",
@@ -39,8 +41,13 @@ public class MembershipDue extends BaseEntity {
     @Column(nullable = false)
     private int year;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
+
+    /** Running total of all VERIFIED installment payments toward this annual due. */
+    @Column(name = "paid_amount", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal paidAmount = ZERO;
 
     @Column(name = "due_date", nullable = false)
     private LocalDate dueDate;

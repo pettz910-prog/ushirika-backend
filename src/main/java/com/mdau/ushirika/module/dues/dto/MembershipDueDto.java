@@ -12,6 +12,8 @@ public record MembershipDueDto(
         String memberId,
         int year,
         BigDecimal amount,
+        BigDecimal paidAmount,
+        BigDecimal remainingAmount,
         String dueDate,
         String paidAt,
         String status,
@@ -21,6 +23,8 @@ public record MembershipDueDto(
         String createdAt
 ) {
     public static MembershipDueDto from(MembershipDue d, String memberId) {
+        BigDecimal paid = d.getPaidAmount() != null ? d.getPaidAmount() : BigDecimal.ZERO;
+        BigDecimal remaining = d.getAmount().subtract(paid).max(BigDecimal.ZERO);
         return new MembershipDueDto(
                 d.getId().toString(),
                 d.getUser().getId().toString(),
@@ -29,6 +33,8 @@ public record MembershipDueDto(
                 memberId,
                 d.getYear(),
                 d.getAmount(),
+                paid,
+                remaining,
                 d.getDueDate() != null ? d.getDueDate().toString() : null,
                 d.getPaidAt() != null ? d.getPaidAt().toString() : null,
                 d.getStatus().name(),

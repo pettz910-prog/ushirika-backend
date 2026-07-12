@@ -28,7 +28,7 @@ public class AdminReinstatementController {
 
         Pageable pageable = PageRequest.of(page, size);
         Page<ReinstatementRequestDto> result = reinstatementService.listAll(status, pageable);
-        return ApiResponse.ok(PagedResponse.from(result));
+        return ApiResponse.ok(PagedResponse.of(result));
     }
 
     @PatchMapping("/admin/reinstatement/{id}/approve")
