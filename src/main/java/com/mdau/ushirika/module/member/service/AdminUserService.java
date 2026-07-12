@@ -126,6 +126,7 @@ public class AdminUserService {
      */
     @Transactional
     public UserProfileDto createMember(CreateMemberRequest req) {
+        log.info("[createMember] start — email={}", req.email());
         if (userRepository.existsByEmail(req.email().toLowerCase())) {
             throw new ConflictException("An account with this email already exists.");
         }
@@ -134,6 +135,7 @@ public class AdminUserService {
         }
 
         String tempPassword = generateTempPassword();
+        log.info("[createMember] building User");
 
         User user = User.builder()
                 .firstName(req.firstName())
@@ -144,14 +146,17 @@ public class AdminUserService {
                 .emailVerified(true)
                 .active(true)
                 .build();
+
+        log.info("[createMember] saving User");
         userRepository.save(user);
+        log.info("[createMember] User saved id={}", user.getId());
 
         String memberId = generateMemberId();
+        log.info("[createMember] memberId={}", memberId);
         String tier = (req.tier() != null && !req.tier().isBlank()) ? req.tier() : "Standard";
 
-        // Use placeholder values for required profile fields the admin doesn't supply.
-        // The member is prompted to update these on their first login.
         String placeholderId = "P-" + user.getId().toString().replace("-", "").substring(0, 18);
+        log.info("[createMember] building MemberProfile placeholderId={}", placeholderId);
         MemberProfile profile = MemberProfile.builder()
                 .user(user)
                 .idNumber(placeholderId)
@@ -166,8 +171,14 @@ public class AdminUserService {
                 .memberSince(LocalDate.now())
                 .membershipTier(tier)
                 .build();
+
+        log.info("[createMember] saving MemberProfile");
         profileRepository.save(profile);
+        log.info("[createMember] MemberProfile saved id={}", profile.getId());
+
+        log.info("[createMember] calling createInitialDues");
         membershipDuesService.createInitialDues(user);
+        log.info("[createMember] createInitialDues done");
 
         try {
             sendWelcomeCredentials(user.getEmail(), user.getFirstName(), memberId, tempPassword);
@@ -175,6 +186,7 @@ public class AdminUserService {
             log.warn("Welcome email failed for {} — account created, credentials must be shared manually: {}", user.getEmail(), e.getMessage());
         }
 
+        log.info("[createMember] building UserProfileDto");
         return UserProfileDto.from(user, profile);
     }
 
