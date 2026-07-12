@@ -187,7 +187,7 @@ public class MembershipDuesService {
 
         // Re-derive paidAmount from DB sum of all VERIFIED installments (idempotent)
         MembershipDue due = payment.getDues();
-        BigDecimal totalPaid = duesPaymentRepository.sumVerifiedAmount(due);
+        BigDecimal totalPaid = duesPaymentRepository.sumVerifiedAmount(due, DuesPaymentStatus.VERIFIED);
         due.setPaidAmount(totalPaid);
 
         if (totalPaid.compareTo(ANNUAL_FEE) >= 0 && due.getStatus() != DuesStatus.PAID) {
@@ -293,7 +293,7 @@ public class MembershipDuesService {
 
     @Transactional
     public int assessOverdue() {
-        List<MembershipDue> overdue = dueRepository.findOverdue(LocalDate.now());
+        List<MembershipDue> overdue = dueRepository.findOverdue(LocalDate.now(), DuesStatus.PENDING);
         overdue.forEach(d -> d.setStatus(DuesStatus.OVERDUE));
         dueRepository.saveAll(overdue);
         log.info("Marked {} dues records as OVERDUE", overdue.size());

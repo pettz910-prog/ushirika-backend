@@ -27,9 +27,9 @@ public interface DuesPaymentRepository extends JpaRepository<DuesPayment, UUID> 
     boolean existsByMemberTxReferenceIgnoreCase(String memberTxReference);
 
     @Query("""
-           SELECT COALESCE(SUM(p.amount), 0)
+           SELECT COALESCE(SUM(p.amount), 0.0)
            FROM DuesPayment p
-           WHERE p.dues = :dues AND p.status = 'VERIFIED'
+           WHERE p.dues = :dues AND p.status = :status
            """)
-    BigDecimal sumVerifiedAmount(@Param("dues") MembershipDue dues);
+    BigDecimal sumVerifiedAmount(@Param("dues") MembershipDue dues, @Param("status") DuesPaymentStatus status);
 }

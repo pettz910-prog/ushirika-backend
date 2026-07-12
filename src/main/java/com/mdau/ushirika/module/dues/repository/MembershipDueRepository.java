@@ -28,8 +28,8 @@ public interface MembershipDueRepository extends JpaRepository<MembershipDue, UU
 
     Page<MembershipDue> findAllByYearAndStatusOrderByCreatedAtDesc(int year, DuesStatus status, Pageable pageable);
 
-    @Query("SELECT d FROM MembershipDue d WHERE d.status = 'PENDING' AND d.dueDate < :today")
-    List<MembershipDue> findOverdue(@Param("today") LocalDate today);
+    @Query("SELECT d FROM MembershipDue d WHERE d.status = :status AND d.dueDate < :today")
+    List<MembershipDue> findOverdue(@Param("today") LocalDate today, @Param("status") DuesStatus status);
 
     List<MembershipDue> findByStatusAndDueDate(DuesStatus status, LocalDate dueDate);
 
