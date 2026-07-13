@@ -1,6 +1,7 @@
 package com.mdau.ushirika.module.member.service;
 
 import com.mdau.ushirika.common.exception.BadRequestException;
+import com.mdau.ushirika.common.exception.ConflictException;
 import com.mdau.ushirika.common.exception.ResourceNotFoundException;
 import com.mdau.ushirika.common.response.PagedResponse;
 import com.mdau.ushirika.module.auth.entity.User;
