@@ -175,6 +175,7 @@ public class MembershipService {
                 .build();
         applicationRepository.save(application);
         notifyAdminsOfPublicApplication(application);
+        sendApplicantConfirmation(application);
         return ApplicationTrackDto.from(application, null);
     }
 
@@ -212,8 +213,7 @@ public class MembershipService {
                 .comment(req.comment())
                 .decidedAt(LocalDateTime.now())
                 .build();
-        approvalRepository.save(approval);
-        application.getApprovals().add(approval);
+        approvalRepository.saveAndFlush(approval);
         application.setStatus(ApplicationStatus.UNDER_REVIEW);
 
         long approved = approvalRepository.countByApplicationAndDecision(application, ApprovalDecision.APPROVED);
@@ -297,6 +297,25 @@ public class MembershipService {
         );
         log.info("Membership application {} approved. Member ID: {}",
                 application.getReferenceNumber(), profile.getMemberId());
+    }
+
+    private void sendApplicantConfirmation(MembershipApplication application) {
+        emailService.sendPlain(
+                application.getApplicantEmail(), application.getApplicantName(),
+                "We received your membership enquiry — Ushirika Welfare DFW",
+                """
+                <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#1a1a1a">
+                  <h2 style="color:#1A4731">Thank you, %s!</h2>
+                  <p>We have received your membership enquiry and it is now under review by our committee.</p>
+                  <p><strong>Your reference number is: %s</strong></p>
+                  <p>You can use this reference number to track your application status at any time by visiting
+                     our website and clicking <em>Track Application</em>.</p>
+                  <p>The committee will be in touch within 5 business days. If you have any questions in the
+                     meantime, please reply to this email.</p>
+                  <p>— Ushirika Welfare Foundation DFW</p>
+                </div>
+                """.formatted(application.getApplicantName(), application.getReferenceNumber())
+        );
     }
 
     private void notifyAdminsOfPublicApplication(MembershipApplication application) {
