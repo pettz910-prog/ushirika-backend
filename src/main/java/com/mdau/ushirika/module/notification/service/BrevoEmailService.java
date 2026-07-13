@@ -4,36 +4,34 @@ import com.mdau.ushirika.module.notification.entity.NotificationLog;
 import com.mdau.ushirika.module.notification.enums.NotificationChannel;
 import com.mdau.ushirika.module.notification.enums.NotificationStatus;
 import com.mdau.ushirika.module.notification.repository.NotificationLogRepository;
+import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-
-import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service
 public class BrevoEmailService implements EmailService {
 
-    private final WebClient.Builder webClientBuilder;
+    private final JavaMailSender mailSender;
     private final NotificationLogRepository logRepository;
 
-    @Value("${app.brevo.api-key:NOT_SET}")
-    private String apiKey;
-
-    @Value("${app.brevo.sender-email}")
+    @Value("${app.brevo.sender-email:lezisign@gmail.com}")
     private String senderEmail;
 
-    @Value("${app.brevo.sender-name}")
+    @Value("${app.brevo.sender-name:Ushirika Welfare}")
     private String senderName;
 
-    public BrevoEmailService(WebClient.Builder webClientBuilder,
+    @Value("${spring.mail.password:NOT_SET}")
+    private String smtpPassword;
+
+    public BrevoEmailService(JavaMailSender mailSender,
                              NotificationLogRepository logRepository) {
-        this.webClientBuilder = webClientBuilder;
-        this.logRepository    = logRepository;
+        this.mailSender  = mailSender;
+        this.logRepository = logRepository;
     }
 
     @Async
@@ -98,43 +96,29 @@ public class BrevoEmailService implements EmailService {
                         .build()
         );
 
-        if ("NOT_SET".equals(apiKey)) {
-            log.warn("[DEV EMAIL — not sent] To: {} | Subject: {} | Body: {}", toEmail, subject, htmlBody);
+        if ("NOT_SET".equals(smtpPassword)) {
+            log.warn("[DEV EMAIL — not sent] To: {} | Subject: {}", toEmail, subject);
             logEntry.setStatus(NotificationStatus.SENT);
             logRepository.save(logEntry);
             return;
         }
 
         try {
-            Map<String, Object> payload = Map.of(
-                    "sender", Map.of("name", senderName, "email", senderEmail),
-                    "to", List.of(Map.of("email", toEmail, "name", toName)),
-                    "subject", subject,
-                    "htmlContent", htmlBody
-            );
-            webClientBuilder.build()
-                    .post()
-                    .uri("https://api.brevo.com/v3/smtp/email")
-                    .header("api-key", apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(payload)
-                    .retrieve()
-                    .toBodilessEntity()
-                    .subscribe(
-                            r -> {
-                                log.info("Email sent to {}", toEmail);
-                                logEntry.setStatus(NotificationStatus.SENT);
-                                logRepository.save(logEntry);
-                            },
-                            e -> {
-                                log.error("Failed to send email to {}: {}", toEmail, e.getMessage());
-                                logEntry.setStatus(NotificationStatus.FAILED);
-                                logEntry.setErrorMessage(truncate(e.getMessage(), 500));
-                                logRepository.save(logEntry);
-                            }
-                    );
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(senderEmail, senderName);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+
+            mailSender.send(message);
+
+            log.info("Email sent via Brevo SMTP to {}", toEmail);
+            logEntry.setStatus(NotificationStatus.SENT);
+            logRepository.save(logEntry);
+
         } catch (Exception e) {
-            log.error("Email error for {}: {}", toEmail, e.getMessage());
+            log.error("Failed to send email to {}: {}", toEmail, e.getMessage());
             logEntry.setStatus(NotificationStatus.FAILED);
             logEntry.setErrorMessage(truncate(e.getMessage(), 500));
             logRepository.save(logEntry);

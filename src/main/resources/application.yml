@@ -17,6 +17,22 @@ spring:
       pool-name: UshirikaHikariPool
       connection-test-query: SELECT 1
 
+  mail:
+    host: smtp-relay.brevo.com
+    port: 587
+    username: ${BREVO_SMTP_USERNAME:lezisign@gmail.com}
+    password: ${BREVO_SMTP_PASSWORD:NOT_SET}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+
   jpa:
     hibernate:
       ddl-auto: ${DDL_AUTO:update}
