@@ -74,7 +74,13 @@ public record UserProfileDto(
             status = "inactive";
         }
 
-        String role = user.getRole() == UserRole.MEMBER ? "member" : "admin";
+        String role = switch (user.getRole()) {
+            case MEMBER     -> "member";
+            case ADMIN      -> "admin";
+            case SUPERADMIN -> "superadmin";
+            case LEADERSHIP -> "leadership";
+            default         -> "admin";
+        };
 
         return new UserProfileDto(
                 user.getId(),
