@@ -1,6 +1,6 @@
 package com.mdau.ushirika.module.member.dto;
 
-import com.mdau.ushirika.module.auth.dto.UserDto;
+import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.member.entity.ApplicationApproval;
 import com.mdau.ushirika.module.member.entity.MembershipApplication;
 import com.mdau.ushirika.module.member.enums.ApplicationStatus;
@@ -14,7 +14,7 @@ import java.util.UUID;
 public record AdminApplicationDto(
         UUID id,
         String referenceNumber,
-        UserDto applicant,
+        ApplicantInfo applicant,
         ApplicationStatus status,
         List<String> documentUrls,
         String rejectionReason,
@@ -25,15 +25,44 @@ public record AdminApplicationDto(
         List<ApprovalSummary> approvals
 ) {
 
+    /** Unified applicant info — works for both authenticated and public submissions. */
+    public record ApplicantInfo(
+            String id,
+            String fullName,
+            String email,
+            String phone,
+            String memberId
+    ) {
+        public static ApplicantInfo fromUser(User user, String memberId) {
+            return new ApplicantInfo(
+                    user.getId().toString(),
+                    user.getFirstName() + " " + user.getLastName(),
+                    user.getEmail(),
+                    user.getPhone(),
+                    memberId
+            );
+        }
+
+        public static ApplicantInfo fromPublicApplication(MembershipApplication app) {
+            return new ApplicantInfo(
+                    null,
+                    app.getApplicantName(),
+                    app.getApplicantEmail(),
+                    app.getApplicantPhone(),
+                    null
+            );
+        }
+    }
+
     /**
      * SUPERADMIN sees full detail (admin name + comment).
      * Regular ADMIN sees vote outcome only — no peer names, no comments (anonymity).
      */
     public record ApprovalSummary(
             UUID id,
-            String adminName,    // null when viewing as ADMIN (peer anonymity)
+            String adminName,
             ApprovalDecision decision,
-            String comment,      // null when viewing as ADMIN
+            String comment,
             LocalDateTime decidedAt
     ) {
         public static ApprovalSummary forSuperAdmin(ApplicationApproval a) {
@@ -64,10 +93,14 @@ public record AdminApplicationDto(
                         : ApprovalSummary.forAdmin(a))
                 .toList();
 
+        ApplicantInfo applicantInfo = app.getUser() != null
+                ? ApplicantInfo.fromUser(app.getUser(), null)
+                : ApplicantInfo.fromPublicApplication(app);
+
         return new AdminApplicationDto(
                 app.getId(),
                 app.getReferenceNumber(),
-                UserDto.from(app.getUser()),
+                applicantInfo,
                 app.getStatus(),
                 app.getDocumentUrls(),
                 app.getRejectionReason(),

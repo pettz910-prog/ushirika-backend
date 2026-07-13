@@ -152,9 +152,30 @@ public class MembershipService {
     public ApplicationTrackDto trackByReference(String referenceNumber) {
         MembershipApplication app = applicationRepository.findByReferenceNumber(referenceNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found for reference: " + referenceNumber));
-        String memberId = profileRepository.findByUser(app.getUser())
-                .map(MemberProfile::getMemberId).orElse(null);
+        String memberId = app.getUser() != null
+                ? profileRepository.findByUser(app.getUser()).map(MemberProfile::getMemberId).orElse(null)
+                : null;
         return ApplicationTrackDto.from(app, memberId);
+    }
+
+    @Transactional
+    public ApplicationTrackDto submitPublicApplication(PublicMembershipApplicationRequest req) {
+        String address = req.street() + ", " + req.city() + ", " + req.state() + " " + req.zipCode();
+        MembershipApplication application = MembershipApplication.builder()
+                .referenceNumber(generateReferenceNumber())
+                .applicantName(req.firstName() + " " + req.lastName())
+                .applicantEmail(req.email())
+                .applicantPhone(req.phone())
+                .applicantCounty(req.kenyaCounty())
+                .applicantSubtribe(req.subtribe())
+                .applicantEligibility(req.eligibility())
+                .applicantAddress(address)
+                .status(ApplicationStatus.SUBMITTED)
+                .submittedAt(LocalDateTime.now())
+                .build();
+        applicationRepository.save(application);
+        notifyAdminsOfPublicApplication(application);
+        return ApplicationTrackDto.from(application, null);
     }
 
     // ------------------------------------------------------------------ Admin
@@ -218,15 +239,27 @@ public class MembershipService {
         application.setReviewedAt(LocalDateTime.now());
 
         User applicant = application.getUser();
-        emailService.sendPlain(
-                applicant.getEmail(), applicant.getFullName(),
-                "Membership Application Update — Ushirika Welfare",
-                "Dear " + applicant.getFirstName() + ",\n\n" +
-                "We regret to inform you that your membership application (ref: " +
-                application.getReferenceNumber() + ") has not been approved at this time.\n\n" +
-                "You are welcome to reapply. If you have questions, please contact our office.\n\n" +
-                "Regards,\nUshirika Welfare Foundation"
-        );
+        if (applicant != null) {
+            emailService.sendPlain(
+                    applicant.getEmail(), applicant.getFullName(),
+                    "Membership Application Update — Ushirika Welfare",
+                    "Dear " + applicant.getFirstName() + ",\n\n" +
+                    "We regret to inform you that your membership application (ref: " +
+                    application.getReferenceNumber() + ") has not been approved at this time.\n\n" +
+                    "You are welcome to reapply. If you have questions, please contact our office.\n\n" +
+                    "Regards,\nUshirika Welfare Foundation"
+            );
+        } else if (application.getApplicantEmail() != null) {
+            emailService.sendPlain(
+                    application.getApplicantEmail(), application.getApplicantName(),
+                    "Membership Enquiry Update — Ushirika Welfare",
+                    "Dear " + application.getApplicantName() + ",\n\n" +
+                    "We have reviewed your membership enquiry (ref: " +
+                    application.getReferenceNumber() + ") and are unable to proceed at this time.\n\n" +
+                    "You are welcome to reapply. If you have questions, please contact our office.\n\n" +
+                    "Regards,\nUshirika Welfare Foundation"
+            );
+        }
         log.info("Membership application {} rejected.", application.getReferenceNumber());
     }
 
@@ -235,7 +268,15 @@ public class MembershipService {
         application.setApprovedAt(LocalDateTime.now());
         application.setReviewedAt(LocalDateTime.now());
 
-        MemberProfile profile = profileRepository.findByUser(application.getUser())
+        User user = application.getUser();
+        if (user == null) {
+            // Public submission — no account exists yet. Admin must create the account manually via "Add Member".
+            log.info("Public membership application {} approved. Admin must create the account via Add Member.",
+                    application.getReferenceNumber());
+            return;
+        }
+
+        MemberProfile profile = profileRepository.findByUser(user)
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for approved application."));
         profile.setMemberId(generateMemberId());
         profile.setMemberSince(LocalDate.now());
@@ -243,12 +284,12 @@ public class MembershipService {
             profile.setMembershipTier("Standard");
         }
         profileRepository.save(profile);
-        membershipDuesService.createInitialDues(application.getUser());
+        membershipDuesService.createInitialDues(user);
 
         emailService.sendPlain(
-                application.getUser().getEmail(), application.getUser().getFullName(),
+                user.getEmail(), user.getFullName(),
                 "Welcome to Ushirika Welfare Foundation!",
-                "Dear " + application.getUser().getFirstName() + ",\n\n" +
+                "Dear " + user.getFirstName() + ",\n\n" +
                 "Congratulations! Your membership application has been approved.\n\n" +
                 "Your Member ID: " + profile.getMemberId() + "\n\n" +
                 "You are now a full member of Ushirika Welfare Foundation.\n\n" +
@@ -256,6 +297,22 @@ public class MembershipService {
         );
         log.info("Membership application {} approved. Member ID: {}",
                 application.getReferenceNumber(), profile.getMemberId());
+    }
+
+    private void notifyAdminsOfPublicApplication(MembershipApplication application) {
+        userRepository.findAllByRoleIn(List.of(UserRole.ADMIN, UserRole.SUPERADMIN)).forEach(admin ->
+                emailService.sendPlain(
+                        admin.getEmail(), admin.getFullName(),
+                        "New Public Membership Enquiry — Action Required",
+                        "Hello " + admin.getFirstName() + ",\n\n" +
+                        "A new public membership enquiry requires your review.\n\n" +
+                        "Applicant: " + application.getApplicantName() + "\n" +
+                        "Email: " + application.getApplicantEmail() + "\n" +
+                        "Reference: " + application.getReferenceNumber() + "\n\n" +
+                        "Log in to the admin portal to review this application.\n\n" +
+                        "Ushirika Welfare Foundation"
+                )
+        );
     }
 
     private void notifyAdminsOfNewApplication(MembershipApplication application, User applicant) {

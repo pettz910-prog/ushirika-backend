@@ -3,6 +3,7 @@ package com.mdau.ushirika.module.member.controller;
 import com.mdau.ushirika.common.response.ApiResponse;
 import com.mdau.ushirika.module.member.dto.ApplicationTrackDto;
 import com.mdau.ushirika.module.member.dto.MembershipApplicationRequest;
+import com.mdau.ushirika.module.member.dto.PublicMembershipApplicationRequest;
 import com.mdau.ushirika.module.member.service.MembershipService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -27,6 +28,15 @@ public class MembershipController {
     @Operation(summary = "Track membership application by reference number (public, no auth required)")
     public ResponseEntity<ApiResponse<ApplicationTrackDto>> track(@RequestParam String ref) {
         return ResponseEntity.ok(ApiResponse.ok("Application found", membershipService.trackByReference(ref)));
+    }
+
+    @PostMapping("/public/membership/applications")
+    @Operation(summary = "Submit a public membership enquiry (no auth required)")
+    public ResponseEntity<ApiResponse<ApplicationTrackDto>> submitPublic(
+            @Valid @RequestBody PublicMembershipApplicationRequest req) {
+        ApplicationTrackDto result = membershipService.submitPublicApplication(req);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok("Application submitted. Track with reference: " + result.referenceNumber(), result));
     }
 
     // ------------------------------------------------------------------ Member (authenticated)

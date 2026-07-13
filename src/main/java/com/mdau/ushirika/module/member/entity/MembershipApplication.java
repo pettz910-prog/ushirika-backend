@@ -34,9 +34,31 @@ import java.util.List;
 public class MembershipApplication extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false,
+    @JoinColumn(name = "user_id", nullable = true,
                 foreignKey = @ForeignKey(name = "fk_ma_user"))
     private User user;
+
+    /** Populated for public (unauthenticated) submissions — no User account yet. */
+    @Column(name = "applicant_name", length = 200)
+    private String applicantName;
+
+    @Column(name = "applicant_email", length = 200)
+    private String applicantEmail;
+
+    @Column(name = "applicant_phone", length = 30)
+    private String applicantPhone;
+
+    @Column(name = "applicant_county", length = 100)
+    private String applicantCounty;
+
+    @Column(name = "applicant_subtribe", length = 100)
+    private String applicantSubtribe;
+
+    @Column(name = "applicant_eligibility", length = 50)
+    private String applicantEligibility;
+
+    @Column(name = "applicant_address", length = 500)
+    private String applicantAddress;
 
     /** Public-facing tracking number — shown to applicant. */
     @Column(name = "reference_number", unique = true, nullable = false,
