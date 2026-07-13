@@ -19,7 +19,7 @@ spring:
 
   mail:
     host: smtp-relay.brevo.com
-    port: 587
+    port: 2525
     username: ${BREVO_SMTP_USERNAME:lezisign@gmail.com}
     password: ${BREVO_SMTP_PASSWORD:NOT_SET}
     properties:
