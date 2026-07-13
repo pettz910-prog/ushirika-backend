@@ -1,11 +1,8 @@
 package com.mdau.ushirika.module.member.service;
 
 import com.mdau.ushirika.common.exception.BadRequestException;
-import com.mdau.ushirika.common.exception.ConflictException;
 import com.mdau.ushirika.common.exception.ResourceNotFoundException;
 import com.mdau.ushirika.common.response.PagedResponse;
-import com.mdau.ushirika.common.service.QuorumApprovalService;
-import com.mdau.ushirika.common.service.QuorumApprovalService.QuorumResult;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.enums.UserRole;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
@@ -14,7 +11,6 @@ import com.mdau.ushirika.module.member.entity.ApplicationApproval;
 import com.mdau.ushirika.module.member.entity.MemberProfile;
 import com.mdau.ushirika.module.member.entity.MembershipApplication;
 import com.mdau.ushirika.module.member.enums.ApplicationStatus;
-import com.mdau.ushirika.module.member.enums.ApprovalDecision;
 import com.mdau.ushirika.module.member.repository.ApplicationApprovalRepository;
 import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import com.mdau.ushirika.module.member.repository.MembershipApplicationRepository;
@@ -43,7 +39,6 @@ public class MembershipService {
     private final ApplicationApprovalRepository approvalRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
-    private final QuorumApprovalService quorumApprovalService;
     private final MembershipDuesService membershipDuesService;
 
     // ------------------------------------------------------------------ Member
@@ -200,12 +195,10 @@ public class MembershipService {
         MembershipApplication application = findApplicationById(applicationId);
 
         if (!List.of(ApplicationStatus.SUBMITTED, ApplicationStatus.UNDER_REVIEW).contains(application.getStatus())) {
-            throw new BadRequestException("Only SUBMITTED or UNDER_REVIEW applications can be reviewed. Current: " + application.getStatus());
-        }
-        if (approvalRepository.existsByApplicationAndAdmin(application, admin)) {
-            throw new ConflictException("You have already cast your vote on this application.");
+            throw new BadRequestException("This application has already been " + application.getStatus().name().toLowerCase() + " and cannot be changed.");
         }
 
+        // Record the decision for audit trail
         ApplicationApproval approval = ApplicationApproval.builder()
                 .application(application)
                 .admin(admin)
@@ -214,17 +207,11 @@ public class MembershipService {
                 .decidedAt(LocalDateTime.now())
                 .build();
         approvalRepository.saveAndFlush(approval);
-        application.setStatus(ApplicationStatus.UNDER_REVIEW);
 
-        long approved = approvalRepository.countByApplicationAndDecision(application, ApprovalDecision.APPROVED);
-        long rejected = approvalRepository.countByApplicationAndDecision(application, ApprovalDecision.REJECTED);
-
-        QuorumResult result = quorumApprovalService.evaluate(approved, rejected);
-
-        switch (result) {
-            case REJECTED -> applyRejection(application);
+        // Single-admin direct decision — quorum mode can be re-enabled later
+        switch (req.decision()) {
             case APPROVED -> applyApproval(application);
-            case PENDING  -> {} // stays UNDER_REVIEW
+            case REJECTED -> applyRejection(application);
         }
 
         applicationRepository.save(application);
