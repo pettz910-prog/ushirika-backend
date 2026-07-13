@@ -1,5 +1,6 @@
 package com.mdau.ushirika.module.notification.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mdau.ushirika.module.notification.entity.NotificationLog;
 import com.mdau.ushirika.module.notification.enums.NotificationChannel;
 import com.mdau.ushirika.module.notification.enums.NotificationStatus;
@@ -12,12 +13,27 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+
 @Slf4j
 @Service
 public class BrevoEmailService implements EmailService {
 
+    private static final String BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+
     private final JavaMailSender mailSender;
     private final NotificationLogRepository logRepository;
+    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient;
+
+    @Value("${app.brevo.api-key:NOT_SET}")
+    private String apiKey;
 
     @Value("${app.brevo.sender-email:lezisign@gmail.com}")
     private String senderEmail;
@@ -29,9 +45,14 @@ public class BrevoEmailService implements EmailService {
     private String smtpPassword;
 
     public BrevoEmailService(JavaMailSender mailSender,
-                             NotificationLogRepository logRepository) {
-        this.mailSender  = mailSender;
+                             NotificationLogRepository logRepository,
+                             ObjectMapper objectMapper) {
+        this.mailSender    = mailSender;
         this.logRepository = logRepository;
+        this.objectMapper  = objectMapper;
+        this.httpClient    = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(30))
+                .build();
     }
 
     @Async
@@ -96,6 +117,20 @@ public class BrevoEmailService implements EmailService {
                         .build()
         );
 
+        // Primary: Brevo REST API over HTTPS (port 443 — never blocked by Railway)
+        if (!"NOT_SET".equals(apiKey)) {
+            try {
+                sendViaBrevoApi(toEmail, toName, subject, htmlBody);
+                log.info("Email sent via Brevo API to {}", toEmail);
+                logEntry.setStatus(NotificationStatus.SENT);
+                logRepository.save(logEntry);
+                return;
+            } catch (Exception e) {
+                log.warn("Brevo API failed for {}, trying SMTP fallback: {}", toEmail, e.getMessage());
+            }
+        }
+
+        // Fallback: SMTP relay
         if ("NOT_SET".equals(smtpPassword)) {
             log.warn("[DEV EMAIL — not sent] To: {} | Subject: {}", toEmail, subject);
             logEntry.setStatus(NotificationStatus.SENT);
@@ -104,25 +139,52 @@ public class BrevoEmailService implements EmailService {
         }
 
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(senderEmail, senderName);
-            helper.setTo(toEmail);
-            helper.setSubject(subject);
-            helper.setText(htmlBody, true);
-
-            mailSender.send(message);
-
+            sendViaSMTP(toEmail, toName, subject, htmlBody);
             log.info("Email sent via Brevo SMTP to {}", toEmail);
             logEntry.setStatus(NotificationStatus.SENT);
             logRepository.save(logEntry);
-
         } catch (Exception e) {
-            log.error("Failed to send email to {}: {}", toEmail, e.getMessage());
+            log.error("All email methods failed for {}: {}", toEmail, e.getMessage());
             logEntry.setStatus(NotificationStatus.FAILED);
             logEntry.setErrorMessage(truncate(e.getMessage(), 500));
             logRepository.save(logEntry);
         }
+    }
+
+    private void sendViaBrevoApi(String toEmail, String toName, String subject, String htmlBody) throws Exception {
+        Map<String, Object> payload = Map.of(
+                "sender",      Map.of("email", senderEmail, "name", senderName),
+                "to",          List.of(Map.of("email", toEmail, "name", toName != null ? toName : toEmail)),
+                "subject",     subject,
+                "htmlContent", htmlBody
+        );
+
+        String json = objectMapper.writeValueAsString(payload);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BREVO_API_URL))
+                .timeout(Duration.ofSeconds(30))
+                .header("api-key", apiKey)
+                .header("Content-Type", "application/json")
+                .header("accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new RuntimeException("Brevo API returned " + response.statusCode() + ": " + response.body());
+        }
+    }
+
+    private void sendViaSMTP(String toEmail, String toName, String subject, String htmlBody) throws Exception {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        helper.setFrom(senderEmail, senderName);
+        helper.setTo(toEmail);
+        helper.setSubject(subject);
+        helper.setText(htmlBody, true);
+        mailSender.send(message);
     }
 
     private static String truncate(String s, int max) {
