@@ -4,6 +4,7 @@ import com.mdau.ushirika.common.response.ApiResponse;
 import com.mdau.ushirika.common.response.PagedResponse;
 import com.mdau.ushirika.module.auth.dto.UserDto;
 import com.mdau.ushirika.module.auth.dto.UserProfileDto;
+import com.mdau.ushirika.module.member.dto.AdminResetCredentialsRequest;
 import com.mdau.ushirika.module.member.dto.CreateMemberRequest;
 import com.mdau.ushirika.module.member.dto.UpdateMemberTierRequest;
 import com.mdau.ushirika.module.member.dto.UpdateRoleRequest;
@@ -75,6 +76,15 @@ public class SuperAdminUserController {
     @Operation(summary = "Deactivate a user account (login blocked)")
     public ResponseEntity<ApiResponse<UserDto>> deactivate(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.ok("User deactivated", adminUserService.setActive(id, false)));
+    }
+
+    @PatchMapping("/{id}/credentials")
+    @Operation(summary = "Force-reset a user's email and/or password — no current password required (SUPERADMIN only)")
+    public ResponseEntity<ApiResponse<UserDto>> resetCredentials(
+            @PathVariable UUID id,
+            @Valid @RequestBody AdminResetCredentialsRequest req
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok("Credentials updated", adminUserService.resetCredentials(id, req)));
     }
 
     @PatchMapping("/{id}/tier")

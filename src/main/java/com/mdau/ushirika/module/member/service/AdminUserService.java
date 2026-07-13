@@ -10,6 +10,7 @@ import com.mdau.ushirika.module.auth.dto.UserProfileDto;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.enums.UserRole;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
+import com.mdau.ushirika.module.member.dto.AdminResetCredentialsRequest;
 import com.mdau.ushirika.module.member.dto.CreateMemberRequest;
 import com.mdau.ushirika.module.member.dto.UpdateMemberTierRequest;
 import com.mdau.ushirika.module.member.dto.UpdateRoleRequest;
@@ -245,6 +246,68 @@ public class AdminUserService {
                 </div>
                 """.formatted(firstName, memberId, toEmail, tempPassword);
         emailService.sendPlain(toEmail, firstName, subject, html);
+    }
+
+    /**
+     * Superadmin force-reset of any user's email and/or password.
+     * No current-password required. Cannot target another SUPERADMIN.
+     */
+    @Transactional
+    public UserDto resetCredentials(UUID userId, AdminResetCredentialsRequest req) {
+        if (req.newEmail() == null && req.newPassword() == null) {
+            throw new BadRequestException("Provide at least one of newEmail or newPassword.");
+        }
+
+        User target = findById(userId);
+
+        if (target.getRole() == UserRole.SUPERADMIN) {
+            throw new ForbiddenException("Cannot reset credentials for the SUPERADMIN account.");
+        }
+
+        String oldEmail = target.getEmail();
+
+        if (req.newEmail() != null && !req.newEmail().isBlank()) {
+            String normalized = req.newEmail().toLowerCase().trim();
+            if (!normalized.equals(oldEmail) && userRepository.existsByEmail(normalized)) {
+                throw new ConflictException("That email address is already in use by another account.");
+            }
+            target.setEmail(normalized);
+            target.setEmailVerified(true);
+        }
+
+        if (req.newPassword() != null && !req.newPassword().isBlank()) {
+            target.setPassword(passwordEncoder.encode(req.newPassword()));
+        }
+
+        userRepository.save(target);
+
+        // Notify the user at their new email (or old one if only password changed)
+        String notifyEmail = target.getEmail();
+        try {
+            emailService.sendPlain(
+                    notifyEmail, target.getFirstName(),
+                    "Your Ushirika account credentials have been updated",
+                    """
+                    <div style="font-family:sans-serif;max-width:480px;margin:auto;color:#1a1a1a">
+                      <h2 style="color:#1A4731">Account Credentials Updated</h2>
+                      <p>Hi %s,</p>
+                      <p>An administrator has updated your login credentials.</p>
+                      %s
+                      <p>If this was unexpected, contact <a href="mailto:admin@ushirikawelfare.org">admin@ushirikawelfare.org</a> immediately.</p>
+                    </div>
+                    """.formatted(
+                            target.getFirstName(),
+                            req.newPassword() != null
+                                    ? "<p>A new password has been set. Please sign in and change it immediately.</p>"
+                                    : ""
+                    )
+            );
+        } catch (Exception e) {
+            log.warn("Credential-reset notification failed for {}: {}", notifyEmail, e.getMessage());
+        }
+
+        log.info("Superadmin reset credentials for user {} ({})", target.getId(), target.getEmail());
+        return UserDto.from(target);
     }
 
     private User findById(UUID id) {
