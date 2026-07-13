@@ -12,6 +12,7 @@ import com.mdau.ushirika.module.member.entity.ApplicationApproval;
 import com.mdau.ushirika.module.member.entity.MemberProfile;
 import com.mdau.ushirika.module.member.entity.MembershipApplication;
 import com.mdau.ushirika.module.member.enums.ApplicationStatus;
+import com.mdau.ushirika.module.member.enums.Gender;
 import com.mdau.ushirika.module.member.repository.ApplicationApprovalRepository;
 import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import com.mdau.ushirika.module.member.repository.MembershipApplicationRepository;
@@ -22,9 +23,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,6 +44,7 @@ public class MembershipService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final MembershipDuesService membershipDuesService;
+    private final PasswordEncoder passwordEncoder;
 
     // ------------------------------------------------------------------ Member
 
@@ -258,9 +262,8 @@ public class MembershipService {
 
         User user = application.getUser();
         if (user == null) {
-            // Public submission — no account exists yet. Admin must create the account manually via "Add Member".
-            log.info("Public membership application {} approved. Admin must create the account via Add Member.",
-                    application.getReferenceNumber());
+            // Public submission — auto-create account and email login credentials to the applicant.
+            autoCreateMemberAccount(application);
             return;
         }
 
@@ -277,14 +280,113 @@ public class MembershipService {
         emailService.sendPlain(
                 user.getEmail(), user.getFullName(),
                 "Welcome to Ushirika Welfare Foundation!",
-                "Dear " + user.getFirstName() + ",\n\n" +
-                "Congratulations! Your membership application has been approved.\n\n" +
-                "Your Member ID: " + profile.getMemberId() + "\n\n" +
-                "You are now a full member of Ushirika Welfare Foundation.\n\n" +
-                "Warmly,\nUshirika Welfare Foundation"
+                """
+                <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#1a1a1a">
+                  <h2 style="color:#1a6b3c">Congratulations, %s!</h2>
+                  <p>Your membership application has been approved. You are now a full member of Ushirika Welfare Foundation.</p>
+                  <p><strong>Your Member ID: %s</strong></p>
+                  <p>Log in to your member portal to access your dashboard.</p>
+                  <p>— Ushirika Welfare Foundation</p>
+                </div>
+                """.formatted(user.getFirstName(), profile.getMemberId())
         );
         log.info("Membership application {} approved. Member ID: {}",
                 application.getReferenceNumber(), profile.getMemberId());
+    }
+
+    private void autoCreateMemberAccount(MembershipApplication application) {
+        String email = application.getApplicantEmail();
+        if (email == null || email.isBlank()) {
+            log.error("Cannot auto-create account for application {} — no email on record", application.getReferenceNumber());
+            return;
+        }
+        email = email.toLowerCase().trim();
+
+        if (userRepository.existsByEmail(email)) {
+            log.warn("Account for {} already exists — skipping auto-creation for application {}",
+                    email, application.getReferenceNumber());
+            return;
+        }
+
+        String fullName = application.getApplicantName() != null ? application.getApplicantName().trim() : "Member";
+        String[] parts = fullName.split(" ", 2);
+        String firstName = parts[0];
+        String lastName  = parts.length > 1 ? parts[1] : "";
+
+        String tempPassword = generateTempPassword();
+
+        User newUser = User.builder()
+                .firstName(firstName)
+                .lastName(lastName)
+                .email(email)
+                .phone(application.getApplicantPhone())
+                .password(passwordEncoder.encode(tempPassword))
+                .emailVerified(true)
+                .active(true)
+                .build();
+        newUser = userRepository.saveAndFlush(newUser);
+
+        String memberId = generateMemberId();
+        MemberProfile profile = MemberProfile.builder()
+                .user(newUser)
+                .idNumber("P-" + UUID.randomUUID().toString().replace("-", "").substring(0, 18))
+                .dateOfBirth(LocalDate.of(1900, 1, 1))
+                .gender(Gender.PREFER_NOT_TO_SAY)
+                .address(application.getApplicantAddress() != null ? application.getApplicantAddress() : "Pending")
+                .county(application.getApplicantCounty() != null ? application.getApplicantCounty() : "Pending")
+                .nextOfKinName("Pending")
+                .nextOfKinPhone("Pending")
+                .nextOfKinRelationship("Pending")
+                .memberId(memberId)
+                .memberSince(LocalDate.now())
+                .membershipTier("Standard")
+                .build();
+        profileRepository.save(profile);
+
+        application.setUser(newUser);
+
+        membershipDuesService.createInitialDues(newUser);
+
+        sendWelcomeCredentials(email, firstName, memberId, tempPassword);
+        log.info("Auto-created member account for public applicant {} — memberId={}", email, memberId);
+    }
+
+    private void sendWelcomeCredentials(String toEmail, String firstName, String memberId, String tempPassword) {
+        String subject = "Welcome to Ushirika Welfare Foundation — Your Member Account";
+        String html = """
+                <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#1a1a1a">
+                  <h2 style="color:#1a6b3c">Welcome, %s!</h2>
+                  <p>Your Ushirika Welfare Foundation membership has been approved and your account is ready.</p>
+                  <table style="border-collapse:collapse;width:100%%;margin:24px 0;border:1px solid #e5e7eb">
+                    <tr style="background:#f9fafb">
+                      <td style="padding:12px 16px;font-weight:600;width:160px">Member ID</td>
+                      <td style="padding:12px 16px;font-family:monospace;font-weight:700">%s</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:12px 16px;font-weight:600;border-top:1px solid #e5e7eb">Login Email</td>
+                      <td style="padding:12px 16px;border-top:1px solid #e5e7eb">%s</td>
+                    </tr>
+                    <tr style="background:#f9fafb">
+                      <td style="padding:12px 16px;font-weight:600;border-top:1px solid #e5e7eb">Temporary Password</td>
+                      <td style="padding:12px 16px;border-top:1px solid #e5e7eb;font-family:monospace;font-weight:700;font-size:16px">%s</td>
+                    </tr>
+                  </table>
+                  <div style="padding:16px;background:#fff3cd;border-left:4px solid #ffc107;border-radius:4px;margin-bottom:24px">
+                    <strong>Important:</strong> Please change your password immediately after first login via <strong>Settings → Change Password</strong>.
+                  </div>
+                  <p><a href="https://ushirikacommunity.site/login" style="display:inline-block;padding:12px 24px;background:#1a6b3c;color:#fff;text-decoration:none;border-radius:24px;font-weight:600">Sign in to your portal</a></p>
+                  <p style="color:#666;font-size:13px">Questions? Contact <a href="mailto:admin@ushirikawelfare.org">admin@ushirikawelfare.org</a></p>
+                </div>
+                """.formatted(firstName, memberId, toEmail, tempPassword);
+        emailService.sendPlain(toEmail, firstName, subject, html);
+    }
+
+    private String generateTempPassword() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!";
+        SecureRandom rand = new SecureRandom();
+        StringBuilder sb = new StringBuilder(12);
+        for (int i = 0; i < 12; i++) sb.append(chars.charAt(rand.nextInt(chars.length())));
+        return sb.toString();
     }
 
     private void sendApplicantConfirmation(MembershipApplication application) {
