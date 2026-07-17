@@ -193,6 +193,7 @@ public class MembershipDuesService {
         if (totalPaid.compareTo(ANNUAL_FEE) >= 0 && due.getStatus() != DuesStatus.PAID) {
             due.setStatus(DuesStatus.PAID);
             due.setPaidAt(LocalDateTime.now());
+            reactivateIfNeeded(due.getUser(), "dues paid in full via installment");
             log.info("Dues fully paid: duesId={} member={} year={} totalPaid={}",
                     due.getId(), due.getUser().getEmail(), due.getYear(), totalPaid);
         }
@@ -264,6 +265,7 @@ public class MembershipDuesService {
         due.setPaymentReference(req.paymentReference());
         due.setNotes(req.notes());
         dueRepository.save(due);
+        reactivateIfNeeded(user, "dues recorded by admin");
 
         log.info("Dues paid (direct): user={} year={} method={}", user.getId(), req.year(), req.paymentMethod());
         MembershipDueDto dto = MembershipDueDto.from(due, memberId(user));
@@ -284,6 +286,7 @@ public class MembershipDuesService {
         due.setStatus(DuesStatus.WAIVED);
         due.setNotes(req != null && req.reason() != null ? req.reason() : due.getNotes());
         dueRepository.save(due);
+        reactivateIfNeeded(due.getUser(), "dues waived by admin");
         auditLogService.log(currentUser(), "DUES_WAIVED", "MembershipDue", due.getId(),
                 "Waived dues for " + due.getUser().getFullName() + " — year " + due.getYear());
         return MembershipDueDto.from(due, memberId(due.getUser()));
@@ -296,6 +299,17 @@ public class MembershipDuesService {
         List<MembershipDue> overdue = dueRepository.findOverdue(LocalDate.now(), DuesStatus.PENDING);
         overdue.forEach(d -> d.setStatus(DuesStatus.OVERDUE));
         dueRepository.saveAll(overdue);
+
+        overdue.stream()
+                .map(MembershipDue::getUser)
+                .filter(User::isActive)
+                .forEach(u -> {
+                    u.setActive(false);
+                    userRepository.save(u);
+                    sendDeactivationEmail(u);
+                    log.info("Deactivated member {} — overdue dues", u.getEmail());
+                });
+
         log.info("Marked {} dues records as OVERDUE", overdue.size());
         return overdue.size();
     }
@@ -404,6 +418,46 @@ public class MembershipDuesService {
                           reason, method, portal);
         emailService.sendPlain(email, name,
             "Action Required: Re-submit Dues Payment — Ushirika Welfare", html);
+    }
+
+    // ── Membership activation helpers ─────────────────────────────────────────
+
+    private void reactivateIfNeeded(User user, String reason) {
+        if (!user.isActive()) {
+            user.setActive(true);
+            userRepository.save(user);
+            log.info("Reactivated member {} — {}", user.getEmail(), reason);
+        }
+    }
+
+    private void sendDeactivationEmail(User user) {
+        String name = user.getFullName();
+        String html = """
+            <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:24px">
+              <h2 style="color:#B91C1C">Membership Status: Inactive</h2>
+              <p>Hi %s,</p>
+              <p>Your Ushirika Welfare membership has been set to <strong>Inactive</strong>
+                 because your annual dues ($100) were not paid by the October 31st deadline.</p>
+              <p>To restore your Active status, please log in to your member portal and submit
+                 your payment. Your access to programs and benefits is paused until dues are settled.</p>
+              <p>
+                <a href="%s/portal/payments"
+                   style="display:inline-block;background:#1A4731;color:#fff;padding:10px 22px;
+                          border-radius:999px;text-decoration:none;font-weight:600">
+                  Pay Now &rarr;
+                </a>
+              </p>
+              <p style="color:#888;font-size:12px">
+                Questions? Contact <a href="mailto:admin@ushirikawelfare.org">admin@ushirikawelfare.org</a>
+              </p>
+            </div>
+            """.formatted(name, siteUrl);
+        try {
+            emailService.sendPlain(user.getEmail(), name,
+                "Your Ushirika Membership is Now Inactive — Pay to Restore", html);
+        } catch (Exception e) {
+            log.warn("Could not send deactivation email to {}: {}", user.getEmail(), e.getMessage());
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

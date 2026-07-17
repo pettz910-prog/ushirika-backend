@@ -24,6 +24,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     List<User> findAllByRoleIn(List<UserRole> roles);
 
+    List<User> findAllByActiveTrue();
+
     long countByRole(UserRole role);
 
     // Matches "First Last" or "Last First" — handles reversed entry and any casing.
