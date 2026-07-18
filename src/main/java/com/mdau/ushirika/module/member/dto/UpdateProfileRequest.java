@@ -20,6 +20,7 @@ public record UpdateProfileRequest(
         String phone,
 
         // ── Identity ──────────────────────────────────────────────────────────
+        @Size(max = 30) String idNumber,
         @NotNull Gender gender,
         @NotNull LocalDate dateOfBirth,
 

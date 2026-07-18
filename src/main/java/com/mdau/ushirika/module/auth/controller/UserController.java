@@ -97,6 +97,9 @@ public class UserController {
         MemberProfile profile = profileRepository.findByUser(user).orElseThrow(
                 () -> new BadRequestException("Profile not found. Complete membership approval first."));
 
+        if (req.idNumber() != null && !req.idNumber().isBlank() && !req.idNumber().startsWith("P-")) {
+            profile.setIdNumber(req.idNumber().trim());
+        }
         profile.setGender(req.gender());
         profile.setDateOfBirth(req.dateOfBirth());
         profile.setAddress(req.address().trim());
