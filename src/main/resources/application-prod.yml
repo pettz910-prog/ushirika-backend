@@ -1,8 +1,7 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    # Railway provides a single DATABASE_URL — append sslmode so the driver accepts it.
+    url: ${DATABASE_URL}?sslmode=require
     hikari:
       maximum-pool-size: 5
       minimum-idle: 2
