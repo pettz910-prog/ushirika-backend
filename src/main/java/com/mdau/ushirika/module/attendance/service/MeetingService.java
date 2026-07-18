@@ -14,7 +14,11 @@ import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.auth.enums.UserRole;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
 import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
+import com.mdau.ushirika.module.notification.enums.InAppNotificationCategory;
+import com.mdau.ushirika.module.notification.service.EmailService;
+import com.mdau.ushirika.module.notification.service.InAppNotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,6 +29,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MeetingService {
@@ -33,6 +38,8 @@ public class MeetingService {
     private final AttendanceRecordRepository attendanceRecordRepository;
     private final UserRepository userRepository;
     private final MemberProfileRepository profileRepository;
+    private final InAppNotificationService inAppNotificationService;
+    private final EmailService emailService;
 
     // ── Admin: meeting CRUD ───────────────────────────────────────────────────
 
@@ -221,7 +228,87 @@ public class MeetingService {
             user.setMembershipCeased(true);
             user.setActive(false);
             userRepository.save(user);
+            sendCessationNotifications(user);
+        } else if (consecutive == 1) {
+            sendAtRiskWarning(user);
         }
+    }
+
+    private void sendCessationNotifications(User user) {
+        String firstName = user.getFullName().contains(" ")
+                ? user.getFullName().split(" ")[0] : user.getFullName();
+
+        // In-app to member
+        inAppNotificationService.createForUser(
+                user.getId(),
+                InAppNotificationCategory.ATTENDANCE_WARNING,
+                "Membership Ceased",
+                "Your membership has been automatically ceased due to two consecutive absences from mandatory quarterly meetings. Submit a reinstatement request to appeal.",
+                "/portal/meetings"
+        );
+
+        // Email to member
+        try {
+            emailService.sendPlain(user.getEmail(), user.getFullName(),
+                    "Your Ushirika Membership Has Been Ceased",
+                    "<p>Dear " + firstName + ",</p>" +
+                    "<p>Your Ushirika membership has been <strong>automatically ceased</strong> due to <strong>two consecutive absences</strong> from mandatory quarterly meetings.</p>" +
+                    "<p>To restore your membership, please log in to the member portal and submit a reinstatement request under <em>My Attendance</em>. Your request will be reviewed by leadership.</p>" +
+                    "<p>If you believe this is an error, please contact the administrator immediately.</p>");
+        } catch (Exception e) {
+            log.warn("Cessation email failed for {}: {}", user.getEmail(), e.getMessage());
+        }
+
+        // In-app + email to leadership and admins
+        List<User> leaders = userRepository.findAllByRoleIn(
+                List.of(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.LEADERSHIP));
+        String leaderBody = "Member " + user.getFullName() + " (" + user.getEmail()
+                + ") has been automatically ceased due to two consecutive absences from mandatory quarterly meetings.";
+        for (User leader : leaders) {
+            inAppNotificationService.createForUser(
+                    leader.getId(),
+                    InAppNotificationCategory.ATTENDANCE_WARNING,
+                    "Membership Ceased: " + user.getFullName(),
+                    leaderBody,
+                    "/admin/members"
+            );
+            try {
+                emailService.sendPlain(leader.getEmail(), leader.getFullName(),
+                        "Membership Cessation — " + user.getFullName(),
+                        "<p>" + leaderBody + "</p>" +
+                        "<p>Please review in the <a href=\"/admin/members\">admin portal</a>. The member may submit a reinstatement request.</p>");
+            } catch (Exception e) {
+                log.warn("Cessation leader email failed for {}: {}", leader.getEmail(), e.getMessage());
+            }
+        }
+
+        log.info("Membership ceased for {} — notifications sent", user.getEmail());
+    }
+
+    private void sendAtRiskWarning(User user) {
+        String firstName = user.getFullName().contains(" ")
+                ? user.getFullName().split(" ")[0] : user.getFullName();
+
+        inAppNotificationService.createForUser(
+                user.getId(),
+                InAppNotificationCategory.ATTENDANCE_WARNING,
+                "Attendance Warning",
+                "You have missed one mandatory quarterly meeting. Missing the next consecutive mandatory meeting will result in automatic cessation of your membership.",
+                "/portal/meetings"
+        );
+
+        try {
+            emailService.sendPlain(user.getEmail(), user.getFullName(),
+                    "Attendance Warning — Ushirika",
+                    "<p>Dear " + firstName + ",</p>" +
+                    "<p>You have missed <strong>one mandatory quarterly meeting</strong>.</p>" +
+                    "<p><strong>Warning:</strong> If you miss the next consecutive mandatory quarterly meeting, your membership will be <strong>automatically ceased</strong>.</p>" +
+                    "<p>Please make every effort to attend upcoming meetings. If you have extenuating circumstances, contact the administrator before the next meeting.</p>");
+        } catch (Exception e) {
+            log.warn("At-risk warning email failed for {}: {}", user.getEmail(), e.getMessage());
+        }
+
+        log.info("At-risk attendance warning sent to {}", user.getEmail());
     }
 
     private int countConsecutiveAbsences(User user) {
