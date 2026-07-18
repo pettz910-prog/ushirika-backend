@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 import java.util.List;
 
 @RestController
@@ -45,5 +47,13 @@ public class MemberBenevolenceController {
     @GetMapping("/benevolence/my/replenishments")
     public ResponseEntity<ApiResponse<List<ReplenishmentPaymentDto>>> getMyReplenishments() {
         return ResponseEntity.ok(ApiResponse.ok(claimService.getMyReplenishments()));
+    }
+
+    @PostMapping("/benevolence/my/replenishments/{paymentId}/pay")
+    public ResponseEntity<ApiResponse<ReplenishmentPaymentDto>> submitMyReplenishmentPayment(
+            @PathVariable UUID paymentId,
+            @Valid @RequestBody MemberReplenishmentPayRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok("Payment submitted",
+                claimService.submitMyReplenishmentPayment(paymentId, req)));
     }
 }

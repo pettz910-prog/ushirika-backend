@@ -1,5 +1,7 @@
 package com.mdau.ushirika.module.auth.controller;
 
+import com.mdau.ushirika.common.exception.BadRequestException;
+import com.mdau.ushirika.common.exception.ConflictException;
 import com.mdau.ushirika.common.exception.ResourceNotFoundException;
 import com.mdau.ushirika.common.response.ApiResponse;
 import com.mdau.ushirika.module.auth.dto.UpdateCredentialsRequest;
@@ -9,6 +11,8 @@ import com.mdau.ushirika.module.auth.enums.UserRole;
 import com.mdau.ushirika.module.auth.repository.UserRepository;
 import com.mdau.ushirika.module.auth.service.AuthService;
 import com.mdau.ushirika.module.dues.service.MembershipDuesService;
+import com.mdau.ushirika.module.member.dto.FullMemberProfileDto;
+import com.mdau.ushirika.module.member.dto.UpdateProfileRequest;
 import com.mdau.ushirika.module.member.entity.MemberProfile;
 import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -61,5 +65,78 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> updateCredentials(@Valid @RequestBody UpdateCredentialsRequest req) {
         authService.updateCredentials(req);
         return ResponseEntity.ok(ApiResponse.ok("Credentials updated. Please sign in with your new details."));
+    }
+
+    // ── Full profile (all editable fields) ────────────────────────────────────
+
+    @GetMapping("/me/full-profile")
+    @Operation(summary = "Get full editable profile", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<ApiResponse<FullMemberProfileDto>> fullProfile() {
+        User user = currentUser();
+        MemberProfile profile = profileRepository.findByUser(user).orElse(null);
+        return ResponseEntity.ok(ApiResponse.ok(FullMemberProfileDto.from(user, profile)));
+    }
+
+    @PutMapping("/me/profile")
+    @Operation(summary = "Update personal profile information", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<ApiResponse<FullMemberProfileDto>> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest req) {
+
+        User user = currentUser();
+
+        // Phone uniqueness check (skip if same as current)
+        if (!req.phone().equals(user.getPhone()) && userRepository.existsByPhone(req.phone())) {
+            throw new ConflictException("That phone number is already registered to another account.");
+        }
+
+        user.setFirstName(req.firstName().trim());
+        user.setLastName(req.lastName().trim());
+        user.setPhone(req.phone().trim());
+        userRepository.save(user);
+
+        MemberProfile profile = profileRepository.findByUser(user).orElseThrow(
+                () -> new BadRequestException("Profile not found. Complete membership approval first."));
+
+        profile.setGender(req.gender());
+        profile.setDateOfBirth(req.dateOfBirth());
+        profile.setAddress(req.address().trim());
+        profile.setCounty(req.county().trim());
+        profile.setMaritalStatus(req.maritalStatus());
+        profile.setSpouseName(req.spouseName() != null ? req.spouseName().trim() : null);
+        profile.setNextOfKinName(req.nextOfKinName().trim());
+        profile.setNextOfKinPhone(req.nextOfKinPhone().trim());
+        profile.setNextOfKinRelationship(req.nextOfKinRelationship().trim());
+        profile.setEmergencyContactName(req.emergencyContactName() != null ? req.emergencyContactName().trim() : null);
+        profile.setEmergencyContactPhone(req.emergencyContactPhone() != null ? req.emergencyContactPhone().trim() : null);
+        profile.setOccupation(req.occupation() != null ? req.occupation().trim() : null);
+        profile.setEmployer(req.employer() != null ? req.employer().trim() : null);
+        profileRepository.save(profile);
+
+        return ResponseEntity.ok(ApiResponse.ok("Profile updated.", FullMemberProfileDto.from(user, profile)));
+    }
+
+    @PatchMapping("/me/photo")
+    @Operation(summary = "Update profile photo URL after Cloudinary upload",
+               security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<ApiResponse<String>> updatePhoto(@RequestBody PhotoUpdateRequest req) {
+        if (req.photoUrl() == null || req.photoUrl().isBlank()) {
+            throw new BadRequestException("photoUrl is required.");
+        }
+        User user = currentUser();
+        MemberProfile profile = profileRepository.findByUser(user).orElseThrow(
+                () -> new BadRequestException("Profile not found."));
+        profile.setPhotoUrl(req.photoUrl().trim());
+        profileRepository.save(profile);
+        return ResponseEntity.ok(ApiResponse.ok("Photo updated.", profile.getPhotoUrl()));
+    }
+
+    public record PhotoUpdateRequest(String photoUrl) {}
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private User currentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found."));
     }
 }
