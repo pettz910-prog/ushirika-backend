@@ -57,24 +57,39 @@ public class DataInitializer implements ApplicationRunner {
     }
 
     private void seedSuperAdmin() {
-        if (userRepository.existsByRole(UserRole.SUPERADMIN)) return;
+        User superAdmin = userRepository.findFirstByRole(UserRole.SUPERADMIN)
+                .orElse(null);
 
-        User superAdmin = User.builder()
-                .firstName("Super")
-                .lastName("Admin")
-                .email(superAdminEmail)
-                .phone(superAdminPhone)
-                .password(passwordEncoder.encode(superAdminPassword))
-                .role(UserRole.SUPERADMIN)
-                .emailVerified(true)
-                .active(true)
-                .build();
+        boolean isNew = (superAdmin == null);
+
+        if (isNew) {
+            superAdmin = User.builder()
+                    .firstName("Super")
+                    .lastName("Admin")
+                    .phone(superAdminPhone)
+                    .role(UserRole.SUPERADMIN)
+                    .emailVerified(true)
+                    .active(true)
+                    .build();
+        }
+
+        // Always overwrite email + password from env vars so redeployment to a new
+        // database (or a migrated one) never leaves stale credentials.
+        superAdmin.setEmail(superAdminEmail);
+        superAdmin.setPassword(passwordEncoder.encode(superAdminPassword));
+        superAdmin.setActive(true);
+        superAdmin.setEmailVerified(true);
 
         userRepository.save(superAdmin);
-        log.warn("========================================================");
-        log.warn("  SUPERADMIN created: {}", superAdminEmail);
-        log.warn("  Change the default password immediately via /auth/reset-password");
-        log.warn("========================================================");
+
+        if (isNew) {
+            log.warn("================================================================");
+            log.warn("  SUPERADMIN created  : {}", superAdminEmail);
+            log.warn("  Credentials sourced from APP_SUPERADMIN_EMAIL / APP_SUPERADMIN_PASSWORD env vars.");
+            log.warn("================================================================");
+        } else {
+            log.info("SUPERADMIN credentials synced from env vars -> {}", superAdminEmail);
+        }
     }
 
     private void seedTestMember() {
