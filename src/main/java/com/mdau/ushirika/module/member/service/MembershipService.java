@@ -12,14 +12,20 @@ import com.mdau.ushirika.module.member.entity.ApplicationApproval;
 import com.mdau.ushirika.module.member.entity.MemberProfile;
 import com.mdau.ushirika.module.member.entity.MembershipApplication;
 import com.mdau.ushirika.module.member.enums.ApplicationStatus;
+import com.mdau.ushirika.module.member.enums.ApprovalDecision;
 import com.mdau.ushirika.module.member.enums.Gender;
 import com.mdau.ushirika.module.member.repository.ApplicationApprovalRepository;
 import com.mdau.ushirika.module.member.repository.MemberProfileRepository;
 import com.mdau.ushirika.module.member.repository.MembershipApplicationRepository;
 import com.mdau.ushirika.module.dues.service.MembershipDuesService;
 import com.mdau.ushirika.module.notification.service.EmailService;
+import com.mdau.ushirika.module.payment.entity.PeerPayment;
+import com.mdau.ushirika.module.payment.enums.PeerPaymentPurpose;
+import com.mdau.ushirika.module.payment.enums.PeerPaymentStatus;
+import com.mdau.ushirika.module.payment.repository.PeerPaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -45,6 +51,10 @@ public class MembershipService {
     private final EmailService emailService;
     private final MembershipDuesService membershipDuesService;
     private final PasswordEncoder passwordEncoder;
+    private final PeerPaymentRepository peerPaymentRepository;
+
+    @Value("${app.site-url:https://ushirikacommunity.site}")
+    private String siteUrl;
 
     // ------------------------------------------------------------------ Member
 
@@ -59,7 +69,9 @@ public class MembershipService {
         List<ApplicationStatus> activeStatuses = List.of(
                 ApplicationStatus.DRAFT,
                 ApplicationStatus.SUBMITTED,
-                ApplicationStatus.UNDER_REVIEW,
+                ApplicationStatus.FORM_SENT,
+                ApplicationStatus.ONBOARDING_IN_PROGRESS,
+                ApplicationStatus.PAYMENT_SUBMITTED,
                 ApplicationStatus.APPROVED
         );
         applicationRepository.findByUser(user).ifPresent(existing -> {
@@ -134,6 +146,7 @@ public class MembershipService {
         applicationRepository.save(application);
 
         notifyAdminsOfNewApplication(application, user);
+        sendApplicantConfirmation(user.getEmail(), user.getFullName(), application.getReferenceNumber());
 
         return ApplicationTrackDto.from(application,
                 profileRepository.findByUser(user).map(MemberProfile::getMemberId).orElse(null));
@@ -175,7 +188,7 @@ public class MembershipService {
                 .build();
         applicationRepository.save(application);
         notifyAdminsOfPublicApplication(application);
-        sendApplicantConfirmation(application);
+        sendApplicantConfirmation(application.getApplicantEmail(), application.getApplicantName(), application.getReferenceNumber());
         return ApplicationTrackDto.from(application, null);
     }
 
@@ -194,13 +207,20 @@ public class MembershipService {
         return AdminApplicationDto.from(findApplicationById(id), isSuperAdmin);
     }
 
+    /** Only REJECTED is accepted here now — accepting an application is done via {@link #sendForm}. */
     @Transactional
     public AdminApplicationDto review(UUID applicationId, AdminReviewRequest req, boolean isSuperAdmin) {
         User admin = currentUser();
         MembershipApplication application = findApplicationById(applicationId);
 
-        if (!List.of(ApplicationStatus.SUBMITTED, ApplicationStatus.UNDER_REVIEW).contains(application.getStatus())) {
+        if (application.getStatus() != ApplicationStatus.SUBMITTED) {
             throw new BadRequestException("This application has already been " + application.getStatus().name().toLowerCase() + " and cannot be changed.");
+        }
+
+        if (req.decision() == ApprovalDecision.APPROVED) {
+            throw new BadRequestException(
+                    "Direct approval is no longer supported. Use \"Send Form\" to accept this application, " +
+                    "then approve membership once the registration fee payment has been verified.");
         }
 
         // Record the decision for audit trail
@@ -213,13 +233,147 @@ public class MembershipService {
                 .build();
         approvalRepository.saveAndFlush(approval);
 
-        // Single-admin direct decision — quorum mode can be re-enabled later
-        switch (req.decision()) {
-            case APPROVED -> applyApproval(application);
-            case REJECTED -> applyRejection(application);
+        applyRejection(application);
+        applicationRepository.save(application);
+        return AdminApplicationDto.from(application, isSuperAdmin);
+    }
+
+    /**
+     * Admin accepts the application in principle: creates (or demotes) the applicant's
+     * account to APPLICANT role and emails them onboarding login credentials. This does
+     * NOT grant membership — see {@link #approveMembership}.
+     */
+    @Transactional
+    public AdminApplicationDto sendForm(UUID applicationId, boolean isSuperAdmin) {
+        MembershipApplication application = findApplicationById(applicationId);
+
+        if (application.getStatus() != ApplicationStatus.SUBMITTED) {
+            throw new BadRequestException(
+                    "Only SUBMITTED applications can have the form sent. Current status: " + application.getStatus());
         }
 
+        String tempPassword = generateTempPassword();
+        User user = application.getUser();
+        String applicantEmail;
+        String applicantFirstName;
+
+        if (user == null) {
+            // Public/anonymous applicant — create their account now, scoped to APPLICANT.
+            String email = application.getApplicantEmail();
+            if (email == null || email.isBlank()) {
+                throw new BadRequestException("Cannot send form — no email on record for this application.");
+            }
+            email = email.toLowerCase().trim();
+            if (userRepository.existsByEmail(email)) {
+                throw new ConflictException("An account with email " + email + " already exists.");
+            }
+
+            String fullName = application.getApplicantName() != null ? application.getApplicantName().trim() : "Applicant";
+            String[] parts = fullName.split(" ", 2);
+            String firstName = parts[0];
+            String lastName  = parts.length > 1 ? parts[1] : "";
+
+            User newUser = User.builder()
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .email(email)
+                    .phone(application.getApplicantPhone())
+                    .password(passwordEncoder.encode(tempPassword))
+                    .role(UserRole.APPLICANT)
+                    .emailVerified(true)
+                    .active(true)
+                    .build();
+            newUser = userRepository.saveAndFlush(newUser);
+
+            // Placeholder profile — real identity fields are collected once the applicant is a MEMBER;
+            // memberId/memberSince/tier are assigned only at final approval.
+            MemberProfile profile = MemberProfile.builder()
+                    .user(newUser)
+                    .idNumber("P-" + UUID.randomUUID().toString().replace("-", "").substring(0, 18))
+                    .dateOfBirth(LocalDate.of(1900, 1, 1))
+                    .gender(Gender.PREFER_NOT_TO_SAY)
+                    .address(application.getApplicantAddress() != null ? application.getApplicantAddress() : "Pending")
+                    .county(application.getApplicantCounty() != null ? application.getApplicantCounty() : "Pending")
+                    .nextOfKinName("Pending")
+                    .nextOfKinPhone("Pending")
+                    .nextOfKinRelationship("Pending")
+                    .build();
+            profileRepository.save(profile);
+
+            application.setUser(newUser);
+            user = newUser;
+            applicantEmail = email;
+            applicantFirstName = firstName;
+        } else {
+            // Applied while logged in — demote to APPLICANT and issue fresh onboarding credentials.
+            user.setRole(UserRole.APPLICANT);
+            user.setPassword(passwordEncoder.encode(tempPassword));
+            userRepository.save(user);
+            applicantEmail = user.getEmail();
+            applicantFirstName = user.getFirstName();
+        }
+
+        application.setStatus(ApplicationStatus.FORM_SENT);
+        application.setFormSentAt(LocalDateTime.now());
+        application.setReviewedAt(LocalDateTime.now());
         applicationRepository.save(application);
+
+        emailService.sendFormSentCredentials(applicantEmail, applicantFirstName, tempPassword, siteUrl + "/login");
+        log.info("Form sent for application {} — applicant={}", application.getReferenceNumber(), applicantEmail);
+
+        return AdminApplicationDto.from(application, isSuperAdmin);
+    }
+
+    /**
+     * Final step: grants full membership once the applicant's onboarding is complete and their
+     * registration fee payment has been verified. Flips the account's role from APPLICANT to MEMBER —
+     * same login credentials, no new account issued.
+     */
+    @Transactional
+    public AdminApplicationDto approveMembership(UUID applicationId, boolean isSuperAdmin) {
+        MembershipApplication application = findApplicationById(applicationId);
+
+        if (application.getStatus() != ApplicationStatus.PAYMENT_SUBMITTED) {
+            throw new BadRequestException(
+                    "Only applications with a submitted registration payment can be approved. Current status: " + application.getStatus());
+        }
+
+        User user = application.getUser();
+        if (user == null) {
+            throw new ResourceNotFoundException("No applicant account linked to this application.");
+        }
+
+        PeerPayment registrationPayment = peerPaymentRepository
+                .findFirstByMemberAndPurposeOrderByCreatedAtDesc(user, PeerPaymentPurpose.REGISTRATION_FEE)
+                .orElseThrow(() -> new BadRequestException("No registration fee payment found for this applicant."));
+        if (registrationPayment.getStatus() != PeerPaymentStatus.VERIFIED) {
+            throw new BadRequestException(
+                    "The registration fee payment must be verified before membership can be approved. " +
+                    "Current payment status: " + registrationPayment.getStatus());
+        }
+
+        MemberProfile profile = profileRepository.findByUser(user)
+                .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for approved application."));
+        profile.setMemberId(generateMemberId());
+        profile.setMemberSince(LocalDate.now());
+        if (profile.getMembershipTier() == null) {
+            profile.setMembershipTier("Standard");
+        }
+        profileRepository.save(profile);
+
+        user.setRole(UserRole.MEMBER);
+        userRepository.save(user);
+
+        membershipDuesService.createInitialDues(user);
+
+        application.setStatus(ApplicationStatus.APPROVED);
+        application.setApprovedAt(LocalDateTime.now());
+        applicationRepository.save(application);
+
+        emailService.sendMembershipApproved(user.getEmail(), user.getFullName(), profile.getMemberId());
+        log.info("Membership approved for application {} — memberId={}",
+                application.getReferenceNumber(), profile.getMemberId());
+
         return AdminApplicationDto.from(application, isSuperAdmin);
     }
 
@@ -255,132 +409,6 @@ public class MembershipService {
         log.info("Membership application {} rejected.", application.getReferenceNumber());
     }
 
-    private void applyApproval(MembershipApplication application) {
-        application.setStatus(ApplicationStatus.APPROVED);
-        application.setApprovedAt(LocalDateTime.now());
-        application.setReviewedAt(LocalDateTime.now());
-
-        User user = application.getUser();
-        if (user == null) {
-            // Public submission — auto-create account and email login credentials to the applicant.
-            autoCreateMemberAccount(application);
-            return;
-        }
-
-        MemberProfile profile = profileRepository.findByUser(user)
-                .orElseThrow(() -> new ResourceNotFoundException("Member profile not found for approved application."));
-        profile.setMemberId(generateMemberId());
-        profile.setMemberSince(LocalDate.now());
-        if (profile.getMembershipTier() == null) {
-            profile.setMembershipTier("Standard");
-        }
-        profileRepository.save(profile);
-        membershipDuesService.createInitialDues(user);
-
-        emailService.sendPlain(
-                user.getEmail(), user.getFullName(),
-                "Welcome to Ushirika Welfare Foundation!",
-                """
-                <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#1a1a1a">
-                  <h2 style="color:#1a6b3c">Congratulations, %s!</h2>
-                  <p>Your membership application has been approved. You are now a full member of Ushirika Welfare Foundation.</p>
-                  <p><strong>Your Member ID: %s</strong></p>
-                  <p>Log in to your member portal to access your dashboard.</p>
-                  <p>— Ushirika Welfare Foundation</p>
-                </div>
-                """.formatted(user.getFirstName(), profile.getMemberId())
-        );
-        log.info("Membership application {} approved. Member ID: {}",
-                application.getReferenceNumber(), profile.getMemberId());
-    }
-
-    private void autoCreateMemberAccount(MembershipApplication application) {
-        String email = application.getApplicantEmail();
-        if (email == null || email.isBlank()) {
-            log.error("Cannot auto-create account for application {} — no email on record", application.getReferenceNumber());
-            return;
-        }
-        email = email.toLowerCase().trim();
-
-        if (userRepository.existsByEmail(email)) {
-            log.warn("Account for {} already exists — skipping auto-creation for application {}",
-                    email, application.getReferenceNumber());
-            return;
-        }
-
-        String fullName = application.getApplicantName() != null ? application.getApplicantName().trim() : "Member";
-        String[] parts = fullName.split(" ", 2);
-        String firstName = parts[0];
-        String lastName  = parts.length > 1 ? parts[1] : "";
-
-        String tempPassword = generateTempPassword();
-
-        User newUser = User.builder()
-                .firstName(firstName)
-                .lastName(lastName)
-                .email(email)
-                .phone(application.getApplicantPhone())
-                .password(passwordEncoder.encode(tempPassword))
-                .emailVerified(true)
-                .active(true)
-                .build();
-        newUser = userRepository.saveAndFlush(newUser);
-
-        String memberId = generateMemberId();
-        MemberProfile profile = MemberProfile.builder()
-                .user(newUser)
-                .idNumber("P-" + UUID.randomUUID().toString().replace("-", "").substring(0, 18))
-                .dateOfBirth(LocalDate.of(1900, 1, 1))
-                .gender(Gender.PREFER_NOT_TO_SAY)
-                .address(application.getApplicantAddress() != null ? application.getApplicantAddress() : "Pending")
-                .county(application.getApplicantCounty() != null ? application.getApplicantCounty() : "Pending")
-                .nextOfKinName("Pending")
-                .nextOfKinPhone("Pending")
-                .nextOfKinRelationship("Pending")
-                .memberId(memberId)
-                .memberSince(LocalDate.now())
-                .membershipTier("Standard")
-                .build();
-        profileRepository.save(profile);
-
-        application.setUser(newUser);
-
-        membershipDuesService.createInitialDues(newUser);
-
-        sendWelcomeCredentials(email, firstName, memberId, tempPassword);
-        log.info("Auto-created member account for public applicant {} — memberId={}", email, memberId);
-    }
-
-    private void sendWelcomeCredentials(String toEmail, String firstName, String memberId, String tempPassword) {
-        String subject = "Welcome to Ushirika Welfare Foundation — Your Member Account";
-        String html = """
-                <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#1a1a1a">
-                  <h2 style="color:#1a6b3c">Welcome, %s!</h2>
-                  <p>Your Ushirika Welfare Foundation membership has been approved and your account is ready.</p>
-                  <table style="border-collapse:collapse;width:100%%;margin:24px 0;border:1px solid #e5e7eb">
-                    <tr style="background:#f9fafb">
-                      <td style="padding:12px 16px;font-weight:600;width:160px">Member ID</td>
-                      <td style="padding:12px 16px;font-family:monospace;font-weight:700">%s</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:12px 16px;font-weight:600;border-top:1px solid #e5e7eb">Login Email</td>
-                      <td style="padding:12px 16px;border-top:1px solid #e5e7eb">%s</td>
-                    </tr>
-                    <tr style="background:#f9fafb">
-                      <td style="padding:12px 16px;font-weight:600;border-top:1px solid #e5e7eb">Temporary Password</td>
-                      <td style="padding:12px 16px;border-top:1px solid #e5e7eb;font-family:monospace;font-weight:700;font-size:16px">%s</td>
-                    </tr>
-                  </table>
-                  <div style="padding:16px;background:#fff3cd;border-left:4px solid #ffc107;border-radius:4px;margin-bottom:24px">
-                    <strong>Important:</strong> Please change your password immediately after first login via <strong>Settings → Change Password</strong>.
-                  </div>
-                  <p><a href="https://ushirikacommunity.site/login" style="display:inline-block;padding:12px 24px;background:#1a6b3c;color:#fff;text-decoration:none;border-radius:24px;font-weight:600">Sign in to your portal</a></p>
-                  <p style="color:#666;font-size:13px">Questions? Contact <a href="mailto:admin@ushirikawelfare.org">admin@ushirikawelfare.org</a></p>
-                </div>
-                """.formatted(firstName, memberId, toEmail, tempPassword);
-        emailService.sendPlain(toEmail, firstName, subject, html);
-    }
-
     private String generateTempPassword() {
         String chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!";
         SecureRandom rand = new SecureRandom();
@@ -389,14 +417,14 @@ public class MembershipService {
         return sb.toString();
     }
 
-    private void sendApplicantConfirmation(MembershipApplication application) {
+    private void sendApplicantConfirmation(String toEmail, String toName, String referenceNumber) {
         emailService.sendPlain(
-                application.getApplicantEmail(), application.getApplicantName(),
-                "We received your membership enquiry — Ushirika Welfare DFW",
+                toEmail, toName,
+                "We received your membership application — Ushirika Welfare DFW",
                 """
                 <div style="font-family:sans-serif;max-width:560px;margin:auto;color:#1a1a1a">
                   <h2 style="color:#1A4731">Thank you, %s!</h2>
-                  <p>We have received your membership enquiry and it is now under review by our committee.</p>
+                  <p>We have received your membership application and it is now under review by our committee.</p>
                   <p><strong>Your reference number is: %s</strong></p>
                   <p>You can use this reference number to track your application status at any time by visiting
                      our website and clicking <em>Track Application</em>.</p>
@@ -404,7 +432,7 @@ public class MembershipService {
                      meantime, please reply to this email.</p>
                   <p>— Ushirika Welfare Foundation DFW</p>
                 </div>
-                """.formatted(application.getApplicantName(), application.getReferenceNumber())
+                """.formatted(toName, referenceNumber)
         );
     }
 

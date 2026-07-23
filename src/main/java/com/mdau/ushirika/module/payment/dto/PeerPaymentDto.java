@@ -2,6 +2,7 @@ package com.mdau.ushirika.module.payment.dto;
 
 import com.mdau.ushirika.module.payment.entity.PeerPayment;
 import com.mdau.ushirika.module.payment.enums.PaymentMode;
+import com.mdau.ushirika.module.payment.enums.PeerPaymentPurpose;
 import com.mdau.ushirika.module.payment.enums.PeerPaymentStatus;
 
 import java.math.BigDecimal;
@@ -20,6 +21,7 @@ public record PeerPaymentDto(
     /** Present only in admin responses — hidden from member-facing endpoints. */
     String adminTxReference,
     String period,
+    PeerPaymentPurpose purpose,
     String notes,
     PeerPaymentStatus status,
     String rejectionReason,
@@ -39,6 +41,7 @@ public record PeerPaymentDto(
             p.getMemberTxReference(),
             p.getAdminTxReference(),
             p.getPeriod(),
+            p.getPurpose(),
             p.getNotes(),
             p.getStatus(),
             p.getRejectionReason(),
@@ -56,7 +59,7 @@ public record PeerPaymentDto(
             full.amount(), full.currency(), full.paymentMode(),
             full.memberTxReference(),
             null,   // adminTxReference not exposed to member
-            full.period(), full.notes(), full.status(), full.rejectionReason(),
+            full.period(), full.purpose(), full.notes(), full.status(), full.rejectionReason(),
             full.verifiedByName(), full.verifiedAt(), full.createdAt()
         );
     }

@@ -61,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers("/financial/admin/**").hasRole("FINANCIAL_ADMIN")
                         // Manual payment operations: financial roles + read-only admins (write guards in service)
                         .requestMatchers("/financial/**").hasAnyRole("FINANCIAL_ADMIN", "FINANCIAL_OFFICIAL", "ADMIN", "SUPERADMIN")
+                        // Applicant onboarding — restricted to APPLICANT role only, never full members
+                        .requestMatchers("/onboarding/**").hasRole("APPLICANT")
                         // Everything else: any authenticated user
                         .anyRequest().authenticated()
                 )

@@ -45,6 +45,10 @@ public class GoverningDocument extends BaseEntity {
     @Column(name = "file_url", length = 1000)
     private String fileUrl;
 
+    /** In-app text content, managed directly by admins. Public page falls back to fileUrl when null. */
+    @Column(name = "content_text", columnDefinition = "TEXT")
+    private String contentText;
+
     /** Cloudinary public_id — used for deletion. Null for external links. */
     @Column(name = "file_public_id", length = 200)
     private String filePublicId;

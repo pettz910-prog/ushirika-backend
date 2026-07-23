@@ -39,6 +39,7 @@ public class ConstitutionService {
                 .documentVersion(req.documentVersion())
                 .fileUrl(req.fileUrl())
                 .filePublicId(req.filePublicId())
+                .contentText(req.contentText())
                 .effectiveDate(req.effectiveDate())
                 .sortOrder(req.sortOrder() != null ? req.sortOrder() : 0)
                 .build();
@@ -54,6 +55,7 @@ public class ConstitutionService {
         if (req.documentVersion() != null) doc.setDocumentVersion(req.documentVersion());
         if (req.fileUrl() != null) doc.setFileUrl(req.fileUrl());
         if (req.filePublicId() != null) doc.setFilePublicId(req.filePublicId());
+        doc.setContentText(req.contentText());
         doc.setEffectiveDate(req.effectiveDate());
         if (req.sortOrder() != null) doc.setSortOrder(req.sortOrder());
         return GoverningDocumentDto.from(repo.save(doc));

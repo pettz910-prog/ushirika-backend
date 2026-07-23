@@ -28,6 +28,9 @@ public record GoverningDocumentRequest(
         @Size(max = 200)
         String filePublicId,
 
+        /** In-app text content — lets admins manage bylaws/constitution without a PDF upload. */
+        String contentText,
+
         LocalDate effectiveDate,
 
         Integer sortOrder

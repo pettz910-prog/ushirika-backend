@@ -12,6 +12,7 @@ import com.mdau.ushirika.module.payment.entity.MemberContribution;
 import com.mdau.ushirika.module.payment.entity.PeerPayment;
 import com.mdau.ushirika.module.payment.enums.ContributionSource;
 import com.mdau.ushirika.module.payment.enums.PaymentMode;
+import com.mdau.ushirika.module.payment.enums.PeerPaymentPurpose;
 import com.mdau.ushirika.module.payment.enums.PeerPaymentStatus;
 import com.mdau.ushirika.module.payment.repository.MemberContributionRepository;
 import com.mdau.ushirika.module.payment.repository.PeerPaymentRepository;
@@ -60,6 +61,7 @@ public class PeerPaymentService {
                 .memberTxReference(req.memberTxReference().strip())
                 .period(req.period())
                 .notes(req.notes())
+                .purpose(req.purpose() != null ? req.purpose() : PeerPaymentPurpose.DUES)
                 .status(PeerPaymentStatus.PENDING)
                 .build();
 

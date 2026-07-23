@@ -58,6 +58,9 @@ public record UserProfileDto(
             status = "ceased";
         } else if (!user.isActive()) {
             status = "suspended";
+        } else if (user.getRole() == UserRole.APPLICANT) {
+            // Mid-onboarding — not yet a member, not staff.
+            status = "pending";
         } else if (user.getRole() != UserRole.MEMBER) {
             // Staff roles are always considered active regardless of dues
             status = "active";
@@ -79,6 +82,7 @@ public record UserProfileDto(
             case ADMIN      -> "admin";
             case SUPERADMIN -> "superadmin";
             case LEADERSHIP -> "leadership";
+            case APPLICANT  -> "applicant";
             default         -> "admin";
         };
 

@@ -161,7 +161,10 @@ public class DashboardService {
                 // DRAFT + SUBMITTED = not yet under review
                 memberApplicationRepository.countByStatus(ApplicationStatus.DRAFT)
                 + memberApplicationRepository.countByStatus(ApplicationStatus.SUBMITTED),
-                memberApplicationRepository.countByStatus(ApplicationStatus.UNDER_REVIEW),
+                // Form sent — applicant is onboarding or has submitted their registration payment
+                memberApplicationRepository.countByStatus(ApplicationStatus.FORM_SENT)
+                + memberApplicationRepository.countByStatus(ApplicationStatus.ONBOARDING_IN_PROGRESS)
+                + memberApplicationRepository.countByStatus(ApplicationStatus.PAYMENT_SUBMITTED),
                 memberApplicationRepository.countByStatus(ApplicationStatus.APPROVED),
                 memberApplicationRepository.countByStatus(ApplicationStatus.REJECTED)
         );

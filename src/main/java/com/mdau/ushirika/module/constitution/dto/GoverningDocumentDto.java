@@ -15,6 +15,7 @@ public record GoverningDocumentDto(
         String         description,
         String         documentVersion,
         String         fileUrl,
+        String         contentText,
         LocalDate      effectiveDate,
         DocumentStatus status,
         LocalDateTime  publishedAt,
@@ -25,7 +26,7 @@ public record GoverningDocumentDto(
     public static GoverningDocumentDto from(GoverningDocument d) {
         return new GoverningDocumentDto(
                 d.getId(), d.getTitle(), d.getDocumentType(),
-                d.getDescription(), d.getDocumentVersion(), d.getFileUrl(),
+                d.getDescription(), d.getDocumentVersion(), d.getFileUrl(), d.getContentText(),
                 d.getEffectiveDate(), d.getStatus(), d.getPublishedAt(),
                 d.getSortOrder(), d.getCreatedAt(), d.getUpdatedAt()
         );

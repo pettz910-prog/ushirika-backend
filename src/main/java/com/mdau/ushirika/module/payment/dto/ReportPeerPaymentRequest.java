@@ -1,6 +1,7 @@
 package com.mdau.ushirika.module.payment.dto;
 
 import com.mdau.ushirika.module.payment.enums.PaymentMode;
+import com.mdau.ushirika.module.payment.enums.PeerPaymentPurpose;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
@@ -23,5 +24,8 @@ public record ReportPeerPaymentRequest(
     String period,
 
     @Size(max = 500)
-    String notes
+    String notes,
+
+    /** Defaults to DUES when omitted — set REGISTRATION_FEE for the onboarding registration payment. */
+    PeerPaymentPurpose purpose
 ) {}

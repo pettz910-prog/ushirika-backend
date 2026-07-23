@@ -2,6 +2,7 @@ package com.mdau.ushirika.module.constitution.repository;
 
 import com.mdau.ushirika.module.constitution.entity.GoverningDocument;
 import com.mdau.ushirika.module.constitution.enums.DocumentStatus;
+import com.mdau.ushirika.module.constitution.enums.DocumentType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -14,4 +15,7 @@ public interface GoverningDocumentRepository extends JpaRepository<GoverningDocu
 
     /** Admin listing — all documents ordered by sort_order then created_at. */
     List<GoverningDocument> findAllByOrderBySortOrderAscCreatedAtDesc();
+
+    /** Onboarding gate — is there a published bylaws/constitution document to accept? */
+    boolean existsByStatusAndDocumentTypeIn(DocumentStatus status, List<DocumentType> documentTypes);
 }

@@ -55,7 +55,7 @@ public class AdminMembershipController {
     }
 
     @PostMapping("/applications/{id}/review")
-    @Operation(summary = "Cast your APPROVED or REJECTED vote on an application")
+    @Operation(summary = "Reject a SUBMITTED application (acceptance is done via Send Form)")
     public ResponseEntity<ApiResponse<AdminApplicationDto>> review(
             @PathVariable UUID id,
             @Valid @RequestBody AdminReviewRequest req,
@@ -65,5 +65,21 @@ public class AdminMembershipController {
                 .anyMatch(a -> a.getAuthority().equals("ROLE_SUPERADMIN"));
         AdminApplicationDto result = membershipService.review(id, req, isSuperAdmin);
         return ResponseEntity.ok(ApiResponse.ok("Vote recorded", result));
+    }
+
+    @PostMapping("/applications/{id}/send-form")
+    @Operation(summary = "Accept an application in principle and send the applicant their onboarding form")
+    public ResponseEntity<ApiResponse<AdminApplicationDto>> sendForm(@PathVariable UUID id, Authentication auth) {
+        boolean isSuperAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SUPERADMIN"));
+        return ResponseEntity.ok(ApiResponse.ok("Form sent to applicant", membershipService.sendForm(id, isSuperAdmin)));
+    }
+
+    @PostMapping("/applications/{id}/approve-membership")
+    @Operation(summary = "Grant full membership once the registration fee payment has been verified")
+    public ResponseEntity<ApiResponse<AdminApplicationDto>> approveMembership(@PathVariable UUID id, Authentication auth) {
+        boolean isSuperAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SUPERADMIN"));
+        return ResponseEntity.ok(ApiResponse.ok("Membership approved", membershipService.approveMembership(id, isSuperAdmin)));
     }
 }

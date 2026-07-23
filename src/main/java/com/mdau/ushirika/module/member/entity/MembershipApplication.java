@@ -96,6 +96,34 @@ public class MembershipApplication extends BaseEntity {
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
 
+    // ── Onboarding pipeline (between "Send Form" and final membership approval) ──
+
+    /** When admin accepted the application in principle and sent onboarding credentials. */
+    @Column(name = "form_sent_at")
+    private LocalDateTime formSentAt;
+
+    /** Extra documents uploaded during onboarding — distinct from the original apply-form documentUrls. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "additional_info_document_urls", columnDefinition = "jsonb")
+    @Builder.Default
+    private List<String> additionalInfoDocumentUrls = new ArrayList<>();
+
+    /** One-time code sent to re-verify the applicant's email during onboarding (separate from account signup OTP). */
+    @Column(name = "onboarding_email_otp", length = 6)
+    private String onboardingEmailOtp;
+
+    @Column(name = "onboarding_email_otp_expiry")
+    private LocalDateTime onboardingEmailOtpExpiry;
+
+    @Column(name = "email_reverified_at")
+    private LocalDateTime emailReverifiedAt;
+
+    @Column(name = "bylaws_accepted_at")
+    private LocalDateTime bylawsAcceptedAt;
+
+    @Column(name = "registration_submitted_at")
+    private LocalDateTime registrationSubmittedAt;
+
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ApplicationApproval> approvals = new ArrayList<>();

@@ -3,6 +3,7 @@ package com.mdau.ushirika.module.payment.entity;
 import com.mdau.ushirika.common.entity.BaseEntity;
 import com.mdau.ushirika.module.auth.entity.User;
 import com.mdau.ushirika.module.payment.enums.PaymentMode;
+import com.mdau.ushirika.module.payment.enums.PeerPaymentPurpose;
 import com.mdau.ushirika.module.payment.enums.PeerPaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -66,6 +67,11 @@ public class PeerPayment extends BaseEntity {
     /** Contribution period this covers — e.g. "2025-06", "2025-Q2", "2025". */
     @Column(name = "period", length = 10)
     private String period;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, length = 20)
+    @Builder.Default
+    private PeerPaymentPurpose purpose = PeerPaymentPurpose.DUES;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
